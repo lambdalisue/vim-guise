@@ -11,12 +11,9 @@ import * as editor from "./editor.ts";
 const GUISE_VIM_ADDRESS = "GUISE_VIM_ADDRESS";
 const GUISE_NVIM_ADDRESS = "GUISE_NVIM_ADDRESS";
 
-export function main(denops: Denops): Promise<void> {
-  Promise.race([
-    listenVim(denops),
-    listenNvim(denops),
-  ]);
-  return Promise.resolve();
+export async function main(denops: Denops): Promise<void> {
+  Promise.race([listenVim(denops), listenNvim(denops)]);
+  await vars.e.set(denops, "EDITOR", await vars.v.get(denops, "progpath"));
 }
 
 class Dispatcher {
