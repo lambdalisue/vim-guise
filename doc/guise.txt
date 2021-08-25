@@ -1,0 +1,45 @@
+*guise.txt*				No more nested Vim/Neovim in terminal
+
+Author:  Alisue <lambdalisue@hashnote.net>
+License: MIT license
+
+=============================================================================
+CONTENTS						*guise-contents*
+
+INTRODUCTION				|guise-introduction|
+INTERFACE				|guise-interface|
+  VARIABLE				|guise-variable|
+
+
+=============================================================================
+INTRODUCTION						*guise-introduction*
+
+*guise.vim* (guise) is a plugin that open a new tab page rather than invokes a
+new nested instance when a user tried to open a new Vim/Neovim through a job
+or terminal on the instance.
+
+
+=============================================================================
+INTERFACE						*guise-interface*
+
+-----------------------------------------------------------------------------
+VARIABLE						*guise-variable*
+
+*g:guise#disable_vim*
+	Do NOT start channel server for Vim.
+
+	Default: 0
+
+*g:guise#disable_neovim*
+	Do NOT start channel server for Neovim.
+
+	Default: 0
+
+*g:guise#disable_editor*
+	Do NOT overwrite "$EDITOR" environment variable.
+
+	Default: 0
+
+
+=============================================================================
+vim:tw=78:fo=tcq2mM:ts=8:ft=help:norl
