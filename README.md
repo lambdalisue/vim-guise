@@ -11,7 +11,9 @@ Guise (guise.vim) is a Vim/Neovim plugin that opens a new tab page rather than
 invokes a new nested instance when a user tried to open a new Vim/Neovim through
 a job or terminal on the instance.
 
-**UNDER DEVELOPMENT**
+![Vim](https://user-images.githubusercontent.com/546312/130876263-5a5a8e29-1204-455a-84af-0070c8776b6f.gif)
+
+![Neovim](https://user-images.githubusercontent.com/546312/130876219-629bef5f-6d0c-4482-906b-9fffa7326295.gif)
 
 ## Requirements
 
