@@ -38,22 +38,22 @@ export async function main(denops: Denops): Promise<void> {
   }
   if (!config.disableEditor) {
     let args: string[];
-    if (denops.meta.host === 'vim') {
+    if (denops.meta.host === "vim") {
       args = [
-        '-R',   // Readonly
-        '-N',   // No compatible
-        '-n',   // No swapfile
-        '-X',   // Do not try connecting to the X server
-        '-es',  // Ex batch mode
+        "-R", // Readonly
+        "-N", // No compatible
+        "-n", // No swapfile
+        "-X", // Do not try connecting to the X server
+        "-es", // Ex batch mode
       ];
     } else {
       args = [
-        '-R',   // Readonly
-        '-n',   // No swapfile
-        '--headless',
-      ]
+        "-R", // Readonly
+        "-n", // No swapfile
+        "--headless",
+      ];
     }
-    await vars.e.set(denops, "EDITOR", `${config.progpath} ${args.join(' ')}`);
+    await vars.e.set(denops, "EDITOR", `${config.progpath} ${args.join(" ")}`);
   }
 }
 
