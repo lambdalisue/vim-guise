@@ -2,6 +2,7 @@ name: test
 
 env:
   DENOPS_PATH: "../denops.vim"
+  DENO_DIR: ".deno"
 
 on:
   schedule:
@@ -14,14 +15,14 @@ on:
       - "**/*.ts"
       - "**/*.vim"
       - ".github/workflows/test.yml"
+      - "Makefile"
   pull_request:
-    branches:
-      - main
     paths:
       - "**/*.md"
       - "**/*.ts"
       - "**/*.vim"
       - ".github/workflows/test.yml"
+      - "Makefile"
 
 defaults:
   run:
@@ -41,9 +42,16 @@ jobs:
       - run: git config --global core.autocrlf false
         if: runner.os == 'Windows'
       - uses: actions/checkout@v2
-      - uses: denoland/setup-deno@main
+      - uses: denoland/setup-deno@v1
         with:
           deno-version: "${{ matrix.version }}"
+      - uses: actions/cache@v2
+        with:
+          path: ${{ env.DENO_DIR }}
+          key: ${{ runner.os }}-deno-${{ matrix.version }}-${{ hashFiles('**/*.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-deno-${{ matrix.version }}-
+            ${{ runner.os }}-deno-
       - name: Lint check
         run: make lint
       - name: Format check
