@@ -21,6 +21,7 @@ a job or terminal on the instance.
 
 ## Similar projects
 
+- [lambdalisue/askpass.vim](https://github.com/lambdalisue/askpass.vim)
 - [thinca/vim-singleton](https://github.com/thinca/vim-singleton)
 - [lambdalisue/edita.vim](https://github.com/lambdalisue/edita.vim)
 - [mhinz/neovim-remote](https://github.com/mhinz/neovim-remote)
