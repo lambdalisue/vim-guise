@@ -27,7 +27,7 @@ test: FORCE	## Test
 	@deno test --unstable -A --jobs
 
 update: FORCE	## Update dependencies
-	@${TOOLS}/bin/udd $$(find ./denops_std -name '*.ts' -not -name '.deno')
+	@${TOOLS}/bin/udd $$(find . -name '*.ts' -not -name '.deno')
 	@make fmt
 
 FORCE:
