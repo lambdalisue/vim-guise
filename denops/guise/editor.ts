@@ -1,9 +1,9 @@
-import type { Denops } from "https://deno.land/x/denops_std@v1.11.2/mod.ts";
-import * as autocmd from "https://deno.land/x/denops_std@v1.11.2/autocmd/mod.ts";
-import * as anonymous from "https://deno.land/x/denops_std@v1.11.2/anonymous/mod.ts";
-import * as batch from "https://deno.land/x/denops_std@v1.11.2/batch/mod.ts";
-import * as fn from "https://deno.land/x/denops_std@v1.11.2/function/mod.ts";
-import { deferred } from "https://deno.land/std@0.106.0/async/mod.ts";
+import type { Denops } from "https://deno.land/x/denops_std@v2.0.0/mod.ts";
+import * as autocmd from "https://deno.land/x/denops_std@v2.0.0/autocmd/mod.ts";
+import * as anonymous from "https://deno.land/x/denops_std@v2.0.0/anonymous/mod.ts";
+import * as batch from "https://deno.land/x/denops_std@v2.0.0/batch/mod.ts";
+import * as fn from "https://deno.land/x/denops_std@v2.0.0/function/mod.ts";
+import { deferred } from "https://deno.land/std@0.109.0/async/mod.ts";
 
 /**
  * Open a scratch buffer in a new tab page and return immediately.
