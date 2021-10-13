@@ -3,6 +3,7 @@ import * as autocmd from "https://deno.land/x/denops_std@v2.0.0/autocmd/mod.ts";
 import * as anonymous from "https://deno.land/x/denops_std@v2.0.0/anonymous/mod.ts";
 import * as batch from "https://deno.land/x/denops_std@v2.0.0/batch/mod.ts";
 import * as fn from "https://deno.land/x/denops_std@v2.0.0/function/mod.ts";
+import * as option from "https://deno.land/x/denops_std@v2.0.0/option/mod.ts";
 import { deferred } from "https://deno.land/std@0.109.0/async/mod.ts";
 
 /**
@@ -23,34 +24,26 @@ export async function edit(denops: Denops, filename: string): Promise<void> {
   }) as [number, number];
   const auname = `guise_editor_${winid}_${bufnr}`;
   const waiter = deferred<void>();
-  const [waiterId] = anonymous.add(denops, async (force: unknown) => {
-    if (
-      !force &&
-      (await fn.win_findbuf(denops, bufnr) as number[]).includes(winid)
-    ) {
-      return;
-    }
+  const [waiterId] = anonymous.add(denops, async () => {
     await autocmd.group(denops, auname, (helper) => {
       helper.remove();
     });
     anonymous.remove(denops, waiterId);
     waiter.resolve();
   });
-  await autocmd.group(denops, auname, (helper) => {
-    helper.remove();
-    helper.define(
-      ["BufEnter", "WinEnter"],
-      "*",
-      `call denops#request('${denops.name}', '${waiterId}', [v:false])`,
-    );
-    helper.define(
-      "VimLeave",
-      "*",
-      `call denops#request('${denops.name}', '${waiterId}', [v:true])`,
-      {
-        once: true,
-      },
-    );
+  await batch.batch(denops, async (denops) => {
+    await option.bufhidden.setLocal(denops, "wipe");
+    await autocmd.group(denops, auname, (helper) => {
+      helper.remove();
+      helper.define(
+        ["BufWipeout", "VimLeave"],
+        "*",
+        `call denops#request('${denops.name}', '${waiterId}', [])`,
+        {
+          once: true,
+        },
+      );
+    });
   });
   await waiter;
 }
