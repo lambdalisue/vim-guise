@@ -17,7 +17,7 @@ export async function open(denops: Denops): Promise<void> {
  * Open a `filename` buffer in a new tab page and wait the buffer is closed.
  */
 export async function edit(denops: Denops, filename: string): Promise<void> {
-  await denops.cmd("noswapfile tabedit `=filename`", { filename });
+  await denops.cmd("silent noswapfile tabedit `=filename`", { filename });
   const [winid, bufnr] = await batch.gather(denops, async (denops) => {
     await fn.win_getid(denops);
     await fn.bufnr(denops);
