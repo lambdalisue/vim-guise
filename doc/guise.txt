@@ -25,6 +25,11 @@ INTERFACE						*guise-interface*
 -----------------------------------------------------------------------------
 VARIABLE						*guise-variable*
 
+*g:guise_edit_opener*
+	Opener expression used to edit file
+
+	Default: "tab drop"
+
 *g:guise#disable_vim*
 	Do NOT start channel server for Vim.
 
