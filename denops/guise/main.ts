@@ -1,7 +1,7 @@
-import type { Denops } from "https://deno.land/x/denops_std@v2.1.3/mod.ts";
-import * as batch from "https://deno.land/x/denops_std@v2.1.3/batch/mod.ts";
-import * as helper from "https://deno.land/x/denops_std@v2.1.3/helper/mod.ts";
-import * as vars from "https://deno.land/x/denops_std@v2.1.3/variable/mod.ts";
+import type { Denops } from "https://deno.land/x/denops_std@v3.1.4/mod.ts";
+import * as batch from "https://deno.land/x/denops_std@v3.1.4/batch/mod.ts";
+import * as helper from "https://deno.land/x/denops_std@v3.1.4/helper/mod.ts";
+import * as vars from "https://deno.land/x/denops_std@v3.1.4/variable/mod.ts";
 import * as unknownutil from "https://deno.land/x/unknownutil@v1.1.4/mod.ts";
 import {
   Session as VimSession,
