@@ -19,7 +19,9 @@ export async function open(denops: Denops): Promise<void> {
  */
 export async function edit(denops: Denops, filename: string): Promise<void> {
   let opener = await vars.g.get(denops, "guise_edit_opener", "tab drop");
-  await denops.cmd(`silent noswapfile ${opener} \`=filename\` | edit`, { filename });
+  await denops.cmd(`silent noswapfile ${opener} \`=filename\` | edit`, {
+    filename,
+  });
   const [winid, bufnr] = await batch.gather(denops, async (denops) => {
     await fn.win_getid(denops);
     await fn.bufnr(denops);
