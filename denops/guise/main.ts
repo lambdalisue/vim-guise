@@ -2,7 +2,7 @@ import type { Denops } from "https://deno.land/x/denops_std@v3.1.4/mod.ts";
 import * as batch from "https://deno.land/x/denops_std@v3.1.4/batch/mod.ts";
 import * as helper from "https://deno.land/x/denops_std@v3.1.4/helper/mod.ts";
 import * as vars from "https://deno.land/x/denops_std@v3.1.4/variable/mod.ts";
-import * as unknownutil from "https://deno.land/x/unknownutil@v1.1.4/mod.ts";
+import * as unknownutil from "https://deno.land/x/unknownutil@v2.0.0/mod.ts";
 import {
   Session as VimSession,
 } from "https://deno.land/x/vim_channel_command@v1.0.0/mod.ts";
@@ -80,7 +80,7 @@ function getDispatcher(denops: Denops): Dispatcher {
     },
 
     edit(filename: unknown) {
-      unknownutil.ensureString(filename);
+      unknownutil.assertString(filename);
       return editor.edit(denops, filename);
     },
 
@@ -88,8 +88,8 @@ function getDispatcher(denops: Denops): Dispatcher {
       exception: unknown,
       throwpoint: unknown,
     ) {
-      unknownutil.ensureString(exception);
-      unknownutil.ensureString(throwpoint);
+      unknownutil.assertString(exception);
+      unknownutil.assertString(throwpoint);
       const message = [exception, throwpoint].join("\n");
       return helper.echo(denops, message);
     },
