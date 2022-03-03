@@ -18,7 +18,7 @@ export async function open(denops: Denops): Promise<void> {
  * Open a `filename` buffer in a new tab page and wait the buffer is closed.
  */
 export async function edit(denops: Denops, filename: string): Promise<void> {
-  let opener = await vars.g.get(denops, "guise_edit_opener", "tab drop");
+  const opener = await vars.g.get(denops, "guise_edit_opener", "tab drop");
   await denops.cmd(`silent noswapfile ${opener} \`=filename\` | edit`, {
     filename,
   });
