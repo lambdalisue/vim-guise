@@ -53,7 +53,11 @@ export async function main(denops: Denops): Promise<void> {
         "--headless",
       ];
     }
-    await vars.e.set(denops, "EDITOR", `${config.progpath} ${args.join(" ")}`);
+    await vars.e.set(
+      denops,
+      "EDITOR",
+      `'${config.progpath}' ${args.join(" ")}`,
+    );
   }
 }
 
