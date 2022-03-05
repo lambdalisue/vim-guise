@@ -53,10 +53,13 @@ export async function main(denops: Denops): Promise<void> {
         "--headless",
       ];
     }
+    const progpath = denops.meta.platform === "windows"
+      ? `"${config.progpath}"`
+      : `'${config.progpath}'`;
     await vars.e.set(
       denops,
       "EDITOR",
-      `'${config.progpath}' ${args.join(" ")}`,
+      `${progpath} ${args.join(" ")}`,
     );
   }
 }
