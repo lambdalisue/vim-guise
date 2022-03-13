@@ -44,7 +44,21 @@ export async function main(denops: Denops): Promise<void> {
         "-N", // No compatible
         "-n", // No swapfile
         "-X", // Do not try connecting to the X server
-        "-es", // Ex batch mode
+        // Ex mode
+        // On Windows, when `-e` is specified, calls via non-terminal (e.g. job or Deno)
+        // hang for some reason.
+        // However, if you do not use `-e`, you will get the following warnings
+        //
+        //  Vim: Warning: Output is not to a terminal
+        //  Vim: Warning: Input is not from a terminal
+        //
+        // For now, we don't know how to deal with these warnings, so we are treating
+        // them as specifications.
+        ...(denops.meta.platform === "windows" ? [] : ["-e"]),
+        // Silent batch mode
+        // On Windows, if `-s` is specified, for some reason, it immediately terminates
+        // and does not function properly.
+        ...(denops.meta.platform === "windows" ? [] : ["-s"]),
       ];
     } else {
       args = [
