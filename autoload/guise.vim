@@ -56,7 +56,7 @@ else
           \ 'mode': 'json',
           \ 'drop': 'auto',
           \ 'noblock': 1,
-          \ 'timeout': 60 * 60 * 24 * 7,
+          \ 'timeout': 60 * 60 * 24 * 7 * 1000,
           \})
     if ch_status(chan) !=# 'open'
       echohl WarningMsg
