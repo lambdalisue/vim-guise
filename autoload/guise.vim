@@ -11,12 +11,12 @@ function! guise#open(address, argv) abort
         call s:request(chan, 'edit', [fnamemodify(filename, ':p')])
       endfor
     endif
+    call s:close(chan)
     qall!
   catch
     call s:request(chan, 'error', [v:exception, v:throwpoint])
-    cquit!
-  finally
     call s:close(chan)
+    cquit!
   endtry
 endfunction
 
