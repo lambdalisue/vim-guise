@@ -1,15 +1,15 @@
-import type { Denops } from "https://deno.land/x/denops_std@v3.1.4/mod.ts";
-import * as batch from "https://deno.land/x/denops_std@v3.1.4/batch/mod.ts";
-import * as helper from "https://deno.land/x/denops_std@v3.1.4/helper/mod.ts";
-import * as vars from "https://deno.land/x/denops_std@v3.1.4/variable/mod.ts";
-import * as unknownutil from "https://deno.land/x/unknownutil@v2.0.0/mod.ts";
+import type { Denops } from "https://deno.land/x/denops_std@v6.5.1/mod.ts";
+import * as batch from "https://deno.land/x/denops_std@v6.5.1/batch/mod.ts";
+import * as helper from "https://deno.land/x/denops_std@v6.5.1/helper/mod.ts";
+import * as vars from "https://deno.land/x/denops_std@v6.5.1/variable/mod.ts";
+import * as unknownutil from "https://deno.land/x/unknownutil@v3.18.1/mod.ts";
 import {
   Session as VimSession,
-} from "https://deno.land/x/vim_channel_command@v1.0.0/mod.ts";
+} from "https://deno.land/x/vim_channel_command@v3.1.1/mod.ts";
 import {
   Dispatcher,
   Session as NvimSession,
-} from "https://deno.land/x/msgpack_rpc@v3.1.4/mod.ts";
+} from "https://deno.land/x/msgpack_rpc@v4.0.1/mod.ts";
 import * as editor from "./editor.ts";
 
 const GUISE_VIM_ADDRESS = "GUISE_VIM_ADDRESS";
