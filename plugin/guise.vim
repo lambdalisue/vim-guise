@@ -8,6 +8,15 @@ if empty(s:address)
   finish
 endif
 
+" Skip guise if Neovim is running in headless mode
+if has('nvim') && exists('v:argv')
+  for arg in v:argv
+    if arg ==# '--headless'
+      finish
+    endif
+  endfor
+endif
+
 augroup guise_plugin_internal
   autocmd!
   autocmd SwapExists * let v:swapchoice = 'o'
