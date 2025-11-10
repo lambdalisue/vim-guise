@@ -1,11 +1,11 @@
-import type { Denops } from "https://deno.land/x/denops_std@v3.1.4/mod.ts";
-import * as autocmd from "https://deno.land/x/denops_std@v3.1.4/autocmd/mod.ts";
-import * as anonymous from "https://deno.land/x/denops_std@v3.1.4/anonymous/mod.ts";
-import * as batch from "https://deno.land/x/denops_std@v3.1.4/batch/mod.ts";
-import * as fn from "https://deno.land/x/denops_std@v3.1.4/function/mod.ts";
-import * as vars from "https://deno.land/x/denops_std@v3.1.4/variable/mod.ts";
-import * as option from "https://deno.land/x/denops_std@v3.1.4/option/mod.ts";
-import { deferred } from "https://deno.land/std@0.128.0/async/mod.ts";
+import type { Denops } from "https://deno.land/x/denops_std@v6.5.1/mod.ts";
+import * as autocmd from "https://deno.land/x/denops_std@v6.5.1/autocmd/mod.ts";
+import * as anonymous from "https://deno.land/x/denops_std@v6.5.1/anonymous/mod.ts";
+import * as batch from "https://deno.land/x/denops_std@v6.5.1/batch/mod.ts";
+import * as fn from "https://deno.land/x/denops_std@v6.5.1/function/mod.ts";
+import * as vars from "https://deno.land/x/denops_std@v6.5.1/variable/mod.ts";
+import * as option from "https://deno.land/x/denops_std@v6.5.1/option/mod.ts";
+import { deferred } from "https://deno.land/std@0.224.0/async/mod.ts";
 
 /**
  * Open a scratch buffer in a new tab page and return immediately.
