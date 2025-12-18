@@ -1,17 +1,47 @@
-import type { Denops } from "https://deno.land/x/denops_std@v3.1.4/mod.ts";
-import * as autocmd from "https://deno.land/x/denops_std@v3.1.4/autocmd/mod.ts";
-import * as anonymous from "https://deno.land/x/denops_std@v3.1.4/anonymous/mod.ts";
-import * as batch from "https://deno.land/x/denops_std@v3.1.4/batch/mod.ts";
-import * as fn from "https://deno.land/x/denops_std@v3.1.4/function/mod.ts";
-import * as vars from "https://deno.land/x/denops_std@v3.1.4/variable/mod.ts";
-import * as option from "https://deno.land/x/denops_std@v3.1.4/option/mod.ts";
-import { deferred } from "https://deno.land/std@0.128.0/async/mod.ts";
+import type { Denops } from "jsr:@denops/std@^8.2.0";
+import { group } from "jsr:@denops/std@^8.2.0/autocmd";
+import { add } from "jsr:@denops/std@^8.2.0/lambda";
+import { batch, collect } from "jsr:@denops/std@^8.2.0/batch";
+import { bufnr, win_getid } from "jsr:@denops/std@^8.2.0/function";
+import * as vars from "jsr:@denops/std@^8.2.0/variable";
+import { bufhidden } from "jsr:@denops/std@^8.2.0/option";
 
 /**
- * Open a scratch buffer in a new tab page and return immediately.
+ * Open a scratch buffer in a new tab page and wait the buffer is closed.
  */
 export async function open(denops: Denops): Promise<void> {
   await denops.cmd("tabnew");
+  const [winid, bufnrVal] = await collect(
+    denops,
+    (denops) => [
+      win_getid(denops),
+      bufnr(denops),
+    ],
+  );
+  const auname = `guise_editor_${winid}_${bufnrVal}`;
+  const { promise: waiter, resolve } = Promise.withResolvers<void>();
+  const lambda = add(denops, async () => {
+    await group(denops, auname, (helper) => {
+      helper.remove();
+    });
+    lambda.dispose();
+    resolve();
+  });
+  await batch(denops, async (denops) => {
+    await bufhidden.setLocal(denops, "wipe");
+    await group(denops, auname, (helper) => {
+      helper.remove();
+      helper.define(
+        ["BufWipeout", "VimLeave"],
+        "*",
+        `call denops#request('${denops.name}', '${lambda.id}', [])`,
+        {
+          once: true,
+        },
+      );
+    });
+  });
+  await waiter;
 }
 
 /**
@@ -19,30 +49,33 @@ export async function open(denops: Denops): Promise<void> {
  */
 export async function edit(denops: Denops, filename: string): Promise<void> {
   const opener = await vars.g.get(denops, "guise_edit_opener", "tab drop");
-  await denops.cmd(`silent noswapfile ${opener} \`=filename\` | edit`, {
+  await denops.cmd(`silent noswapfile ${opener} \`=filename\``, {
     filename,
   });
-  const [winid, bufnr] = await batch.gather(denops, async (denops) => {
-    await fn.win_getid(denops);
-    await fn.bufnr(denops);
-  }) as [number, number];
-  const auname = `guise_editor_${winid}_${bufnr}`;
-  const waiter = deferred<void>();
-  const [waiterId] = anonymous.add(denops, async () => {
-    await autocmd.group(denops, auname, (helper) => {
+  const [winid, bufnrVal] = await collect(
+    denops,
+    (denops) => [
+      win_getid(denops),
+      bufnr(denops),
+    ],
+  );
+  const auname = `guise_editor_${winid}_${bufnrVal}`;
+  const { promise: waiter, resolve } = Promise.withResolvers<void>();
+  const lambda = add(denops, async () => {
+    await group(denops, auname, (helper) => {
       helper.remove();
     });
-    anonymous.remove(denops, waiterId);
-    waiter.resolve();
+    lambda.dispose();
+    resolve();
   });
-  await batch.batch(denops, async (denops) => {
-    await option.bufhidden.setLocal(denops, "wipe");
-    await autocmd.group(denops, auname, (helper) => {
+  await batch(denops, async (denops) => {
+    await bufhidden.setLocal(denops, "wipe");
+    await group(denops, auname, (helper) => {
       helper.remove();
       helper.define(
         ["BufWipeout", "VimLeave"],
         "*",
-        `call denops#request('${denops.name}', '${waiterId}', [])`,
+        `call denops#request('${denops.name}', '${lambda.id}', [])`,
         {
           once: true,
         },

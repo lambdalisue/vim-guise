@@ -1,12 +1,11 @@
 {
   "lint": {
-    "files": {
-      "exclude": [".deno"]
+    "exclude": [".deno"],
+    "rules": {
+      "exclude": ["no-import-prefix"]
     }
   },
   "fmt": {
-    "files": {
-      "exclude": [".deno"]
-    }
+    "exclude": [".deno"]
   }
 }
