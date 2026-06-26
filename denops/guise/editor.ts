@@ -41,7 +41,7 @@ export async function open(denops: Denops): Promise<void> {
       );
       helper.define(
         ["BufWipeout"],
-        "<buffer=abuf>",
+        `<buffer=${bufnrVal}>`,
         `call denops#request('${denops.name}', '${lambda.id}', [])`,
         {
           once: true,
@@ -90,7 +90,7 @@ export async function edit(denops: Denops, filename: string): Promise<void> {
       );
       helper.define(
         ["BufWipeout"],
-        "<buffer=abuf>",
+        `<buffer=${bufnrVal}>`,
         `call denops#request('${denops.name}', '${lambda.id}', [])`,
         {
           once: true,
