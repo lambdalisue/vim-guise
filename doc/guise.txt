@@ -14,7 +14,7 @@ INTERFACE				|guise-interface|
 =============================================================================
 INTRODUCTION						*guise-introduction*
 
-*guise.vim* (guise) is a plugin that open a new tab page rather than invokes a
+*guise* is a plugin that open a new tab page rather than invokes a
 new nested instance when a user tried to open a new Vim/Neovim through a job
 or terminal on the instance.
 

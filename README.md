@@ -1,13 +1,13 @@
-# 🎭 guise.vim
+# 🎭 guise
 
 [![Vim 9.2.0153 or above](https://img.shields.io/badge/Vim-Support%209.2.0153-yellowgreen.svg?logo=vim)](https://github.com/vim/vim/tree/v9.2.0153)
 [![Neovim 0.10.0 or above](https://img.shields.io/badge/Neovim-Support%200.10.0-yellowgreen.svg?logo=neovim&logoColor=white)](https://github.com/neovim/neovim/tree/v0.10.0)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![vim help](https://img.shields.io/badge/vim-%3Ah%20guise-orange.svg)](doc/guise.txt)
-[![test](https://github.com/lambdalisue/guise.vim/actions/workflows/test.yml/badge.svg)](https://github.com/lambdalisue/guise.vim/actions/workflows/test.yml)
+[![test](https://github.com/lambdalisue/vim-guise/actions/workflows/test.yml/badge.svg)](https://github.com/lambdalisue/vim-guise/actions/workflows/test.yml)
 
-Guise (guise.vim) is a Vim/Neovim plugin that opens a new tab page rather than
+Guise is a Vim/Neovim plugin that opens a new tab page rather than
 invokes a new nested instance when a user tried to open a new Vim/Neovim through
 a job or terminal on the instance.
 
