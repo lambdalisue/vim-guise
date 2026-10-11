@@ -18,6 +18,9 @@ INTRODUCTION						*guise-introduction*
 new nested instance when a user tried to open a new Vim/Neovim through a job
 or terminal on the instance.
 
+guise requires Vim 9.2.0153 or above (for |ch_listen()|) or Neovim 0.10.0 or
+above. On older Vim it shows a warning and does nothing.
+
 
 =============================================================================
 INTERFACE						*guise-interface*
@@ -31,17 +34,31 @@ VARIABLE						*guise-variable*
 	Default: "tab drop"
 
 *g:guise#disable_vim*
-	Do NOT start channel server for Vim.
+	Do NOT forward a nested Vim to the parent instance.
+	This is read by the nested Vim, so set it in your vimrc. It does not
+	affect "$EDITOR", which starts Vim without a vimrc; use
+	|g:guise#disable_editor| for that.
 
 	Default: 0
 
 *g:guise#disable_neovim*
-	Do NOT start channel server for Neovim.
+	Do NOT forward a nested Neovim to the parent instance.
+	This is read by the nested Neovim, so set it in your init.vim or
+	init.lua. It does not affect "$EDITOR", which starts Neovim without
+	a config; use |g:guise#disable_editor| for that.
 
 	Default: 0
 
 *g:guise#disable_editor*
 	Do NOT overwrite "$EDITOR" environment variable.
+
+	Default: 0
+
+*g:guise#enable_headless*
+	Start guise even when Vim runs in silent Ex mode (|-es|) or Neovim
+	runs with "--headless". guise does not start there by default,
+	because nobody can see the tab page it would open and a forwarded
+	program would wait forever. This is mainly for testing.
 
 	Default: 0
 

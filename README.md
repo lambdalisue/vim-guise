@@ -1,8 +1,7 @@
 # 🎭 guise.vim
 
-[![Deno 1.17.1 or above](https://img.shields.io/badge/Deno-Support%201.17.1-yellowgreen.svg?logo=deno)](https://github.com/denoland/deno/tree/v1.17.1)
-[![Vim 8.2.3452 or above](https://img.shields.io/badge/Vim-Support%208.2.3452-yellowgreen.svg?logo=vim)](https://github.com/vim/vim/tree/v8.2.3452)
-[![Neovim 0.6.0 or above](https://img.shields.io/badge/Neovim-Support%200.6.0-yellowgreen.svg?logo=neovim&logoColor=white)](https://github.com/neovim/neovim/tree/v0.6.0)
+[![Vim 9.2.0153 or above](https://img.shields.io/badge/Vim-Support%209.2.0153-yellowgreen.svg?logo=vim)](https://github.com/vim/vim/tree/v9.2.0153)
+[![Neovim 0.10.0 or above](https://img.shields.io/badge/Neovim-Support%200.10.0-yellowgreen.svg?logo=neovim&logoColor=white)](https://github.com/neovim/neovim/tree/v0.10.0)
 
 [![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![vim help](https://img.shields.io/badge/vim-%3Ah%20guise-orange.svg)](doc/guise.txt)
@@ -18,7 +17,7 @@ a job or terminal on the instance.
 
 ## Requirements
 
-- [denops.vim](https://github.com/vim-denops/denops.vim)
+- Vim 9.2.0153 or above (for `ch_listen()`), or Neovim 0.10.0 or above
 
 ## Similar projects
 
