@@ -1,9 +1,5 @@
 name: test
 
-env:
-  DENOPS_PATH: "../denops.vim"
-  DENO_DIR: ".deno"
-
 on:
   schedule:
     - cron: "0 7 * * 0"
@@ -11,16 +7,14 @@ on:
     branches:
       - main
     paths:
-      - "**/*.md"
-      - "**/*.ts"
       - "**/*.vim"
+      - "**/*.lua"
       - ".github/workflows/test.yml"
       - "Makefile"
   pull_request:
     paths:
-      - "**/*.md"
-      - "**/*.ts"
       - "**/*.vim"
+      - "**/*.lua"
       - ".github/workflows/test.yml"
       - "Makefile"
 
@@ -29,32 +23,22 @@ defaults:
     shell: bash --noprofile --norc -eo pipefail {0}
 
 jobs:
-  check:
+  test:
     strategy:
+      fail-fast: false
       matrix:
         runner:
           - ubuntu-latest
-        version:
-          - "1.17.1"
-          - "1.x"
+          - macos-latest
     runs-on: ${{ matrix.runner }}
     steps:
-      - run: git config --global core.autocrlf false
-        if: runner.os == 'Windows'
-      - uses: actions/checkout@v2
-      - uses: denoland/setup-deno@v1
+      - uses: actions/checkout@v7
+      - uses: rhysd/action-setup-vim@v1
         with:
-          deno-version: "${{ matrix.version }}"
-      - uses: actions/cache@v2
+          version: nightly
+      - uses: rhysd/action-setup-vim@v1
         with:
-          path: ${{ env.DENO_DIR }}
-          key: ${{ runner.os }}-deno-${{ matrix.version }}-${{ hashFiles('**/*.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-deno-${{ matrix.version }}-
-            ${{ runner.os }}-deno-
-      - name: Lint check
-        run: make lint
-      - name: Format check
-        run: make fmt-check
-      - name: Type check
-        run: make type-check
+          neovim: true
+          version: stable
+      - name: Test
+        run: make test
