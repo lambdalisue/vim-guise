@@ -84,7 +84,7 @@ function! s:probe(cmd, setup, expr) abort
         \ 'call writefile([' .. a:expr .. '], ' .. string(out) .. ')',
         \ 'qall!',
         \], scriptfile)
-  let job = s:spawn([], 'GUISE_ADDRESS= EDITOR=original ' .. a:cmd .. ' -S ' .. shellescape(scriptfile))
+  let job = s:spawn([], 'GUISE_ADDRESS= EDITOR=original VISUAL=original ' .. a:cmd .. ' -S ' .. shellescape(scriptfile))
   call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'probed instance does not exit')
   return filereadable(out) ? readfile(out)[0] : '<no output>'
 endfunction
@@ -163,10 +163,18 @@ function! s:test_disable_editor_accepts_boolean() abort
   let setup = ['let g:guise#enable_headless = 1', 'let g:guise#disable_editor = v:true']
   call assert_equal('original', s:probe('vim -Nu NONE -i NONE -n -es', setup, '$EDITOR'))
   call assert_equal('original', s:probe('nvim --headless --clean -n', setup, '$EDITOR'))
+  call assert_equal('original', s:probe('vim -Nu NONE -i NONE -n -es', setup, '$VISUAL'))
+  call assert_equal('original', s:probe('nvim --headless --clean -n', setup, '$VISUAL'))
 endfunction
 
 function! s:test_editor_is_exported() abort
   call assert_match('guise', $EDITOR)
+endfunction
+
+" Many programs prefer $VISUAL to $EDITOR, so a $VISUAL inherited from the
+" shell that started this instance would hide $EDITOR.
+function! s:test_visual_is_exported_as_editor() abort
+  call assert_equal($EDITOR, $VISUAL)
 endfunction
 
 " Programs in a terminal may run with another $PATH or working directory

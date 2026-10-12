@@ -134,6 +134,7 @@ function M.start()
       vim.fn.shellescape(editor_script),
       "--",
     }, " ")
+    vim.env.VISUAL = vim.env.EDITOR
   end
 
   local group = vim.api.nvim_create_augroup("guise_server_internal", {})

@@ -21,12 +21,11 @@ a job or terminal on the instance.
 
 ## Shell configuration
 
-guise exports `$GUISE_ADDRESS` and `$EDITOR` to programs started from the
-instance. A shell started in a terminal reads its startup files after that, so a
-shell that assigns `$EDITOR` unconditionally overwrites the value guise exported,
-and `git commit` in the terminal starts its own editor instead of opening a tab
-page in the parent. Git prefers `$GIT_EDITOR`, `core.editor`, and `$VISUAL` over
-`$EDITOR`, so any of them hides the value as well.
+guise exports `$GUISE_ADDRESS`, `$EDITOR`, and `$VISUAL` to programs started
+from the instance. A shell started in a terminal reads its startup files after
+that, so a shell that assigns `$EDITOR` or `$VISUAL` unconditionally overwrites
+the value guise exported, and programs in the terminal start their own editor
+instead of opening a tab page in the parent.
 
 Assign the editor variables only when `$GUISE_ADDRESS` is empty:
 
