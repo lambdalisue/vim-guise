@@ -238,6 +238,82 @@ function! s:test_open_without_arguments_opens_scratch_buffer() abort
   call assert_equal(0, job.exitval)
 endfunction
 
+" Run ":checkhealth guise" on Neovim or ":GuiseCheck" on Vim against an
+" interactive sh, or [shell] if given, that reads {rc} through $ENV, and
+" return the report.
+function! s:check(rc, ...) abort
+  let rcfile = s:tmpdir .. '/shellrc'
+  call writefile(a:rc, rcfile)
+  let saved = [&shell, $ENV]
+  let &shell = a:0 ? a:1 : 'sh'
+  let $ENV = rcfile
+  try
+    if has('nvim')
+      silent checkhealth guise
+      let report = join(getline(1, '$'), "\n")
+      bwipeout!
+      return report
+    endif
+    return execute('GuiseCheck')
+  finally
+    let [&shell, $ENV] = saved
+  endtry
+endfunction
+
+function! s:test_check_accepts_shell_that_keeps_editor() abort
+  let report = s:check(['if [ -z "$GUISE_ADDRESS" ]; then export EDITOR=vi VISUAL=vi; fi'])
+  call assert_match('OK', report)
+  call assert_notmatch('WARNING\|ERROR', report)
+endfunction
+
+function! s:test_check_accepts_quoted_shell() abort
+  let report = s:check([], '"' .. exepath('sh') .. '"')
+  call assert_notmatch('WARNING\|ERROR', report)
+endfunction
+
+function! s:test_check_survives_shell_that_breaks_path() abort
+  let report = s:check(['PATH=/nonexistent'])
+  call assert_notmatch('WARNING\|ERROR', report)
+endfunction
+
+function! s:test_check_warns_shell_that_overwrites_editor() abort
+  let report = s:check(['export EDITOR=vi'])
+  call assert_match('WARNING[^\n]*\$EDITOR[^\n]*"vi"', report)
+endfunction
+
+function! s:test_check_warns_shell_that_overwrites_visual() abort
+  let report = s:check(['export VISUAL=vi'])
+  call assert_match('WARNING[^\n]*\$VISUAL[^\n]*"vi"', report)
+endfunction
+
+function! s:test_check_errors_shell_that_drops_address() abort
+  let report = s:check(['unset GUISE_ADDRESS'])
+  call assert_match('ERROR[^\n]*\$GUISE_ADDRESS', report)
+endfunction
+
+function! s:test_check_skips_shell_when_editor_is_disabled() abort
+  let g:guise#disable_editor = 1
+  try
+    let report = s:check(['export EDITOR=vi'])
+  finally
+    let g:guise#disable_editor = 0
+  endtry
+  call assert_notmatch('WARNING\|ERROR', report)
+  call assert_match('guise#disable_editor', report)
+endfunction
+
+" A nested Vim/Neovim still reaches the instance through $GUISE_ADDRESS when
+" $EDITOR is left to the user.
+function! s:test_check_errors_dropped_address_when_editor_is_disabled() abort
+  let g:guise#disable_editor = 1
+  try
+    let report = s:check(['unset GUISE_ADDRESS'])
+  finally
+    let g:guise#disable_editor = 0
+  endtry
+  call assert_match('ERROR[^\n]*\$GUISE_ADDRESS', report)
+endfunction
+
 let s:names = sort(filter(map(split(execute('function /test_'), "\n"),
       \ { _, v -> matchstr(v, '\<SNR>\d\+_\zstest_\w\+') }),
       \ { _, v -> !empty(v) }))

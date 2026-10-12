@@ -32,6 +32,8 @@ if empty(s:address)
   if has('nvim')
     lua require('guise.server').start()
   elseif exists('*ch_listen')
+    " Neovim reports the same through ":checkhealth guise".
+    command! GuiseCheck call guise#health#echo()
     call guise#server#Start()
   else
     echohl WarningMsg

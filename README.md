@@ -45,7 +45,8 @@ if test -z "$GUISE_ADDRESS"
 end
 ```
 
-See `:help guise-shell` for details.
+`:checkhealth guise` on Neovim and `:GuiseCheck` on Vim report whether your
+shell keeps these variables. See `:help guise-shell` for details.
 
 ## Similar projects
 
