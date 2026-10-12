@@ -19,6 +19,35 @@ a job or terminal on the instance.
 
 - Vim 9.2.0153 or above (for `ch_listen()`), or Neovim 0.10.0 or above
 
+## Shell configuration
+
+guise exports `$GUISE_ADDRESS`, `$EDITOR`, and `$VISUAL` to programs started
+from the instance. A shell started in a terminal reads its startup files after
+that, so a shell that assigns `$EDITOR` or `$VISUAL` unconditionally overwrites
+the value guise exported, and programs in the terminal start their own editor
+instead of opening a tab page in the parent.
+
+Assign the editor variables only when `$GUISE_ADDRESS` is empty:
+
+```sh
+# sh, bash, zsh
+if [ -z "$GUISE_ADDRESS" ]; then
+  export EDITOR=nvim
+  export VISUAL="$EDITOR"
+fi
+```
+
+```fish
+# fish
+if test -z "$GUISE_ADDRESS"
+    set -gx EDITOR nvim
+    set -gx VISUAL $EDITOR
+end
+```
+
+`:checkhealth guise` on Neovim and `:GuiseCheck` on Vim report whether your
+shell keeps these variables. See `:help guise-shell` for details.
+
 ## Similar projects
 
 - [lambdalisue/askpass.vim](https://github.com/lambdalisue/askpass.vim)

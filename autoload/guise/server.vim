@@ -33,6 +33,7 @@ export def Start()
       shellescape(EDITOR_SCRIPT),
       '--',
     ])
+    $VISUAL = $EDITOR
   endif
 
   augroup guise_server_internal

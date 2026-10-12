@@ -7,7 +7,9 @@ License: MIT license
 CONTENTS						*guise-contents*
 
 INTRODUCTION				|guise-introduction|
+SHELL					|guise-shell|
 INTERFACE				|guise-interface|
+  COMMAND				|guise-command|
   VARIABLE				|guise-variable|
 
 
@@ -23,7 +25,59 @@ above. On older Vim it shows a warning and does nothing.
 
 
 =============================================================================
+SHELL							*guise-shell*
+
+guise exports "$GUISE_ADDRESS", "$EDITOR", and "$VISUAL" from the running
+Vim/Neovim, and a program started from a job or |terminal| inherits them. A
+shell started in |terminal| reads its startup files (".bashrc", ".zshrc",
+"config.fish", ...) after that, so a shell that assigns "$EDITOR" or
+"$VISUAL" unconditionally overwrites the value guise exported. Programs that
+read them then start their own editor inside the terminal instead of opening
+a tab page in the parent.
+
+Some programs read a variable or a setting of their own first (e.g.
+"$GIT_EDITOR" of Git). Any of them that names another editor hides the value
+guise exported in the same way.
+
+Assign the editor variables only when "$GUISE_ADDRESS" is empty, which means
+the shell is not running under guise.
+
+sh, bash, zsh: >sh
+	if [ -z "$GUISE_ADDRESS" ]; then
+	  export EDITOR=nvim
+	  export VISUAL="$EDITOR"
+	fi
+<
+fish: >fish
+	if test -z "$GUISE_ADDRESS"
+	    set -gx EDITOR nvim
+	    set -gx VISUAL $EDITOR
+	end
+<
+Point a program-specific variable or setting at "$EDITOR" under guise, or
+leave it unset so that the program falls back to "$EDITOR".
+
+":checkhealth guise" on Neovim and |:GuiseCheck| on Vim start 'shell' as an
+interactive shell with the environment of the running instance, and report
+whether "$GUISE_ADDRESS", "$EDITOR", and "$VISUAL" survive its startup files.
+They do not see the settings of each program. The shell runs without a
+terminal, because startup files that draw a prompt or query the terminal
+would garble the output or wait for a reply; a startup file that branches on
+a terminal (e.g. "[ -t 0 ]") may therefore behave differently in |terminal|.
+
+Set |g:guise#disable_editor| instead to keep "$EDITOR" and "$VISUAL"
+untouched by guise.
+
+
+=============================================================================
 INTERFACE						*guise-interface*
+
+-----------------------------------------------------------------------------
+COMMAND							*guise-command*
+
+*:GuiseCheck*
+	Check that a shell in |terminal| keeps the variables guise exported.
+	See |guise-shell|. Vim only; use ":checkhealth guise" on Neovim.
 
 -----------------------------------------------------------------------------
 VARIABLE						*guise-variable*
@@ -50,7 +104,7 @@ VARIABLE						*guise-variable*
 	Default: 0
 
 *g:guise#disable_editor*
-	Do NOT overwrite "$EDITOR" environment variable.
+	Do NOT overwrite "$EDITOR" and "$VISUAL" environment variables.
 
 	Default: 0
 
