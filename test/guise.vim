@@ -228,6 +228,21 @@ function! s:test_edit_from_the_other_editor() abort
   call assert_equal(0, job.exitval)
 endfunction
 
+" Neovim runs each line of a command string as a command of its own, and
+" fnameescape() does not escape a newline, so the rest of such a name would
+" run in the parent. The payload avoids every character fnameescape() escapes.
+function! s:test_edit_refuses_file_name_with_newline() abort
+  let g:guise_test_injected = 0
+  let command = 'let g:guise_test_injected=1'
+  let payload = 'exe(' .. join(map(split(command, '\zs'), { _, c -> 'nr2char(' .. char2nr(c) .. ')' }), '..') .. ')'
+  let job = s:spawn([s:tmpdir .. "/a\n" .. payload])
+  " Neovim raises the refusal the child reports back as an error of its own.
+  silent! call s:wait(5000, { -> job.exitval isnot# v:null })
+  call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'editor does not exit')
+  call assert_notequal(0, job.exitval)
+  call assert_equal(0, g:guise_test_injected)
+endfunction
+
 function! s:test_open_without_arguments_opens_scratch_buffer() abort
   let tabcount = tabpagenr('$')
   let job = s:spawn([])

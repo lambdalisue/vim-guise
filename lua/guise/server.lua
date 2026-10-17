@@ -69,6 +69,12 @@ local handlers = {
     wait_wipe(reply)
   end,
   edit = function(reply, _, filename)
+    -- fnameescape() leaves a newline as it is, and vim.cmd() runs each line as
+    -- a command of its own.
+    if filename:find("\n", 1, true) then
+      reply("[guise] a file name that contains a newline cannot be opened")
+      return
+    end
     local opener = vim.g.guise_edit_opener or "tab drop"
     vim.cmd(("silent noswapfile %s %s"):format(opener, vim.fn.fnameescape(filename)))
     wait_wipe(reply)

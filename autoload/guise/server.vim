@@ -124,6 +124,12 @@ def Dispatch(expr: list<any>, Reply: func(string, ...list<any>), Connected: func
     tabnew
     WaitWipe(Reply)
   elseif method ==# 'edit'
+    # fnameescape() leaves a newline as it is, which ends the command line
+    # and runs the rest of the name as a command.
+    if expr[1] =~# "\n"
+      Reply('[guise] a file name that contains a newline cannot be opened')
+      return
+    endif
     const opener = get(g:, 'guise_edit_opener', 'tab drop')
     execute $'silent noswapfile {opener} {fnameescape(expr[1])}'
     WaitWipe(Reply)
