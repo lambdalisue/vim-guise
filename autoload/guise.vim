@@ -41,7 +41,15 @@ endfunction
 " the parent cannot be reached. {Do} returns v:false to quit with failure
 " without reporting an error to the parent.
 function! s:run(address, Do, ping_timeout) abort
-  let chan = s:connect(a:address)
+  " The token stays out of every message, which may end up on a terminal.
+  let [address, token] = matchlist(a:address, '^\(.\{-}\)\%(#\(\x\+\)\)\=$')[1 : 2]
+  if empty(token)
+    echohl WarningMsg
+    echomsg printf('[guise] guise is disabled because "%s" has no token', address)
+    echohl None
+    return
+  endif
+  let chan = s:connect(address)
   if chan is# v:null
     return
   endif
@@ -49,11 +57,12 @@ function! s:run(address, Do, ping_timeout) abort
   " parent started keeps the socket listening after the parent dies. The
   " connection then succeeds with nobody behind it, and only a reply proves the
   " parent is alive. Waiting for an edit has no time limit, so check it first.
+  " The parent closes the connection without a reply to a wrong token as well.
   try
-    call s:request(chan, 'ping', [], a:ping_timeout)
+    call s:request(chan, 'auth', [token], a:ping_timeout)
   catch
     echohl ErrorMsg
-    echomsg printf('[guise] the parent at "%s" does not respond', a:address)
+    echomsg printf('[guise] the parent at "%s" does not respond', address)
     echohl None
     execute 'cquit!' s:UNREACHABLE
   endtry
