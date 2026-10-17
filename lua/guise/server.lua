@@ -70,15 +70,24 @@ local handlers = {
     vim.cmd("tabnew")
     wait_wipe(reply)
   end,
-  edit = function(reply, _, filename)
+  edit = function(reply, _, filename, line)
     -- fnameescape() leaves a newline as it is, and vim.cmd() runs each line as
     -- a command of its own.
     if filename:find("\n", 1, true) then
       reply("[guise] a file name that contains a newline cannot be opened")
       return
     end
+    if line ~= nil and line ~= "$" and (type(line) ~= "number" or line % 1 ~= 0) then
+      reply('[guise] a line must be a number or "$"')
+      return
+    end
     local opener = vim.g.guise_edit_opener or "tab drop"
     vim.cmd(("silent noswapfile %s %s"):format(opener, vim.fn.fnameescape(filename)))
+    if line ~= nil then
+      local last = vim.api.nvim_buf_line_count(0)
+      local lnum = line == "$" and last or math.min(math.max(line, 1), last)
+      vim.api.nvim_win_set_cursor(0, { lnum, 0 })
+    end
     wait_wipe(reply)
   end,
   ask = function(reply, connected, prompt, hint)
@@ -164,6 +173,12 @@ end
 
 local is_windows = vim.fn.has("win32") == 1
 
+-- Some programs split $EDITOR on whitespace and run it without a shell, where
+-- quotes would stay in the program name.
+local function shell_word(s)
+  return s:match("^[%w_@%%+=:,./-]+$") and s or vim.fn.shellescape(s)
+end
+
 -- shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
 local function shell_quote(s)
   return "'" .. s:gsub("'", [['\'']]) .. "'"
@@ -236,9 +251,9 @@ function M.start()
   local disable_editor = vim.g["guise#disable_editor"]
   if not disable_editor or disable_editor == 0 then
     vim.env.EDITOR = table.concat({
-      vim.fn.shellescape(vim.v.progpath),
+      shell_word(vim.v.progpath),
       "--headless --clean -n -S",
-      vim.fn.shellescape(editor_script),
+      shell_word(editor_script),
       "--",
     }, " ")
     vim.env.VISUAL = vim.env.EDITOR

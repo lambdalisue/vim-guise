@@ -22,6 +22,11 @@ new nested instance when a user tried to open a new Vim/Neovim through a job
 or terminal on the instance. It also lets such a program ask for a passphrase
 or a password with a prompt of the instance. See |guise-askpass|.
 
+"$EDITOR" opens each file it is given in the instance. Like Vim, it puts the
+cursor on line N of the first file for "+N", and on the last line for "+".
+Any other argument that starts with "+" is taken as a file name, so that a
+program cannot run a command in the instance.
+
 guise requires Vim 9.2.0153 or above (for |ch_listen()|) or Neovim 0.10.0 or
 above. On older Vim it shows a warning and does nothing.
 
@@ -45,6 +50,11 @@ a tab page in the parent.
 Some programs read a variable or a setting of their own first (e.g.
 "$GIT_EDITOR" of Git). Any of them that names another editor hides the value
 guise exported in the same way.
+
+Most programs run "$EDITOR" through a shell, but some split it on whitespace
+and start it without one. guise quotes a path in "$EDITOR" only when a shell
+needs the quotes, so such a program can start it as long as the paths of
+Vim/Neovim and of guise contain no space or other shell metacharacter.
 
 Assign the editor variables only when "$GUISE_ADDRESS" is empty, which means
 the shell is not running under guise.

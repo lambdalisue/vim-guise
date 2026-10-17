@@ -42,9 +42,9 @@ export def Start()
   $GUISE_ADDRESS = (has('win32') ? $'127.0.0.1:{ch_info(server).port}' : address) .. '#' .. token
   if !get(g:, 'guise#disable_editor', 0)
     $EDITOR = join([
-      shellescape(exepath(v:progpath)),
+      ShellWord(exepath(v:progpath)),
       '-Nu NONE -i NONE -n -es -S',
-      shellescape(EDITOR_SCRIPT),
+      ShellWord(EDITOR_SCRIPT),
       '--',
     ])
     $VISUAL = $EDITOR
@@ -97,6 +97,12 @@ def Token(): string
   catch
     return sha256(string(mapnew(range(8), (_, _) => srand())))
   endtry
+enddef
+
+# Some programs split $EDITOR on whitespace and run it without a shell, where
+# quotes would stay in the program name.
+def ShellWord(s: string): string
+  return s =~# '^[[:alnum:]_@%+=:,./-]\+$' ? s : shellescape(s)
 enddef
 
 # shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
@@ -156,8 +162,18 @@ def Dispatch(expr: list<any>, Reply: func(string, ...list<any>), Connected: func
       Reply('[guise] a file name that contains a newline cannot be opened')
       return
     endif
+    const lnum = get(expr, 2, '')
+    const last = type(lnum) == v:t_string && lnum ==# '$'
+    const jump = last || type(lnum) == v:t_number
+    if len(expr) > 2 && !jump
+      Reply('[guise] a line must be a number or "$"')
+      return
+    endif
     const opener = get(g:, 'guise_edit_opener', 'tab drop')
     execute $'silent noswapfile {opener} {fnameescape(expr[1])}'
+    if jump
+      cursor(last ? line('$') : max([lnum, 1]), 1)
+    endif
     WaitWipe(Reply)
   elseif method ==# 'ask'
     if !askpass_exported
