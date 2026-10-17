@@ -14,10 +14,12 @@ local editor_script = vim.fs.joinpath(root, "script", "editor.vim")
 local askpass_script = vim.fs.joinpath(root, "script", "askpass.vim")
 local askpass_shell_script = vim.fs.joinpath(root, "script", "askpass.sh")
 
+-- A child proves with it that it was started from this instance.
+local token
 -- Replies waiting for a buffer to be wiped, keyed by the buffer number.
 local pending = {}
--- Any local user can reach the TCP port used on Windows, so the server prompts
--- for a secret only when it has exported askpass, which it never does there.
+-- The server prompts for a secret only when it has exported askpass, which it
+-- never does on Windows, where the wrapper cannot run without /bin/sh.
 local askpass_exported = false
 -- Prompts waiting for the one that is reading keys, which a prompt opened in
 -- the meantime would take over.
@@ -95,7 +97,7 @@ local handlers = {
       end, reply, connected)
     end
   end,
-  ping = function(reply, _)
+  auth = function(reply, _)
     reply("")
   end,
   error = function(reply, _, exception, throwpoint)
@@ -104,12 +106,23 @@ local handlers = {
   end,
 }
 
-local function dispatch(client, line)
+local function dispatch(client, state, line)
   local ok, message = pcall(vim.json.decode, line)
   if not ok or type(message) ~= "table" or type(message[2]) ~= "table" then
     return
   end
   local id, expr = message[1], message[2]
+  -- Anything but the right token first is not from a child of this instance,
+  -- and it gets no reply that could tell it what is wrong.
+  if not state.authorized then
+    if expr[1] ~= "auth" or type(expr[2]) ~= "string" or vim.fn.sha256(expr[2]) ~= vim.fn.sha256(token) then
+      if not client:is_closing() then
+        client:close()
+      end
+      return
+    end
+    state.authorized = true
+  end
   local function reply(err, result)
     if not client:is_closing() then
       client:write(vim.json.encode({ id, { error = err, result = result } }) .. "\n")
@@ -133,6 +146,7 @@ local function accept(server, new_handle)
   local client = new_handle()
   server:accept(client)
   local buffer = ""
+  local state = { authorized = false }
   client:read_start(function(err, chunk)
     if err or not chunk then
       client:close()
@@ -141,7 +155,7 @@ local function accept(server, new_handle)
     buffer = buffer .. chunk
     for line in buffer:gmatch("([^\n]*)\n") do
       vim.schedule(function()
-        dispatch(client, line)
+        dispatch(client, state, line)
       end)
     end
     buffer = buffer:match("[^\n]*$")
@@ -208,12 +222,17 @@ function M.start()
     )
     return
   end
+  -- A loopback TCP port is open to every local user, so a child must present
+  -- a secret only the environment of this instance carries.
+  token = vim.text.hexencode(assert(vim.uv.random(16)))
+  local address
   if is_windows then
     local addr = server:getsockname()
-    vim.env.GUISE_ADDRESS = ("%s:%d"):format(addr.ip, addr.port)
+    address = ("%s:%d"):format(addr.ip, addr.port)
   else
-    vim.env.GUISE_ADDRESS = "unix:" .. server:getsockname()
+    address = "unix:" .. server:getsockname()
   end
+  vim.env.GUISE_ADDRESS = address .. "#" .. token
   local disable_editor = vim.g["guise#disable_editor"]
   if not disable_editor or disable_editor == 0 then
     vim.env.EDITOR = table.concat({

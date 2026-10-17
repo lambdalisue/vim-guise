@@ -65,11 +65,70 @@ function! s:find_tab(Pred) abort
   return 0
 endfunction
 
+function! s:socket() abort
+  return matchstr($GUISE_ADDRESS, '^unix:\zs.\{-}\ze#\x\+$')
+endfunction
+
 function! s:test_address_is_a_socket_in_a_private_directory() abort
   call assert_match('^unix:/', $GUISE_ADDRESS)
-  let path = matchstr($GUISE_ADDRESS, '^unix:\zs.*')
-  call assert_equal('socket', getftype(path))
-  call assert_equal('rwx------', getfperm(fnamemodify(path, ':h')))
+  call assert_equal('socket', getftype(s:socket()))
+  call assert_equal('rwx------', getfperm(fnamemodify(s:socket(), ':h')))
+endfunction
+
+" A socket in a private directory is out of reach of other users, but the TCP
+" port used on Windows is not.
+function! s:test_address_carries_a_token() abort
+  call assert_match('#\x\{32,}$', $GUISE_ADDRESS)
+endfunction
+
+" Send {lines} to the server of this instance as they are, and return the
+" lines it replied before it closed the connection.
+function! s:raw_request(lines) abort
+  let out = tempname()
+  let job = s:spawn([], join([
+        \ 'python3 -I', shellescape(s:root .. '/test/raw_request.py'),
+        \ shellescape(s:socket()), shellescape(out),
+        \] + map(copy(a:lines), { _, v -> shellescape(v) })))
+  call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'raw request does not exit')
+  return filter(readfile(out), { _, v -> !empty(v) })
+endfunction
+
+" An address without a token comes from something other than guise, and a
+" child that silently runs nested leaves no clue why.
+function! s:test_child_warns_address_without_token() abort
+  let expr = 'execute(''call guise#open("unix:/nonexistent", [])'')'
+  call assert_match('has no token', s:probe('vim -Nu NONE -i NONE -n -es', [], expr))
+  call assert_match('has no token', s:probe('nvim --headless --clean -n', [], expr))
+endfunction
+
+function! s:test_server_answers_the_token() abort
+  if !executable('python3')
+    return
+  endif
+  let token = matchstr($GUISE_ADDRESS, '#\zs\x\+$')
+  call assert_equal(['[1,{"error":""}]'], map(s:raw_request([json_encode([1, ['auth', token]])]),
+        \ { _, v -> substitute(v, '\s', '', 'g') }))
+endfunction
+
+function! s:test_server_refuses_request_without_token() abort
+  if !executable('python3')
+    return
+  endif
+  let filename = s:tmpdir .. '/untrusted.txt'
+  call assert_equal([], s:raw_request([json_encode([1, ['edit', filename]])]))
+  call assert_equal(0, s:find_tab({ b -> s:same_file(bufname(b), filename) }))
+endfunction
+
+function! s:test_server_refuses_request_with_wrong_token() abort
+  if !executable('python3')
+    return
+  endif
+  let filename = s:tmpdir .. '/untrusted.txt'
+  call assert_equal([], s:raw_request([
+        \ json_encode([1, ['auth', repeat('0', 32)]]),
+        \ json_encode([2, ['edit', filename]]),
+        \]))
+  call assert_equal(0, s:find_tab({ b -> s:same_file(bufname(b), filename) }))
 endfunction
 
 " Load guise in a fresh instance started by {cmd}, after running {setup}, and
@@ -453,8 +512,8 @@ function! s:test_askpass_notification_does_not_wait() abort
   call assert_equal([], readfile(out))
 endfunction
 
-" On Windows any local user can reach the TCP port of the server, so a parent
-" that does not export askpass must not prompt for a secret.
+" A parent that does not export askpass, as on Windows, must not prompt for a
+" secret.
 function! s:test_ask_is_refused_when_askpass_is_disabled() abort
   let [parent, address, editor] = s:start_parent([], ['let g:guise#disable_askpass = 1'])
   try
@@ -562,6 +621,13 @@ endfunction
 function! s:test_check_errors_shell_that_drops_address() abort
   let report = s:check(['unset GUISE_ADDRESS'])
   call assert_match('ERROR[^\n]*\$GUISE_ADDRESS', report)
+endfunction
+
+" A report gets pasted into issues.
+function! s:test_check_does_not_show_the_token() abort
+  let report = s:check([])
+  call assert_match(escape(s:socket(), '\.*$~['), report)
+  call assert_notmatch(matchstr($GUISE_ADDRESS, '#\zs\x\+$'), report)
 endfunction
 
 function! s:test_check_skips_shell_when_editor_is_disabled() abort

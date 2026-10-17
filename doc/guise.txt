@@ -25,6 +25,11 @@ or a password with a prompt of the instance. See |guise-askpass|.
 guise requires Vim 9.2.0153 or above (for |ch_listen()|) or Neovim 0.10.0 or
 above. On older Vim it shows a warning and does nothing.
 
+"$GUISE_ADDRESS" ends with a random token, and the running Vim/Neovim serves
+only a program that presents it. Anyone who knows the value can open files
+and prompts in the instance, so keep it out of logs and reports. The health
+check leaves the token out.
+
 
 =============================================================================
 SHELL							*guise-shell*

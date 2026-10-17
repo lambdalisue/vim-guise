@@ -15,10 +15,12 @@ const ASKPASS_SCRIPT = ROOT .. '/script/askpass.vim'
 const ASKPASS_SHELL_SCRIPT = ROOT .. '/script/askpass.sh'
 
 var server: channel
+# A child proves with it that it was started from this instance.
+var token: string
 # Replies waiting for a buffer to be wiped, keyed by the buffer number.
 var pending: dict<list<func(string, ...list<any>)>> = {}
-# Any local user can reach the TCP port used on Windows, so the server prompts
-# for a secret only when it has exported askpass, which it never does there.
+# The server prompts for a secret only when it has exported askpass, which it
+# never does on Windows, where the wrapper cannot run without /bin/sh.
 var askpass_exported = false
 # Prompts waiting for the one that is reading keys, which a prompt opened in
 # the meantime would take over.
@@ -36,7 +38,8 @@ export def Start()
     echohl None
     return
   endif
-  $GUISE_ADDRESS = has('win32') ? $'127.0.0.1:{ch_info(server).port}' : address
+  token = Token()
+  $GUISE_ADDRESS = (has('win32') ? $'127.0.0.1:{ch_info(server).port}' : address) .. '#' .. token
   if !get(g:, 'guise#disable_editor', 0)
     $EDITOR = join([
       shellescape(exepath(v:progpath)),
@@ -83,6 +86,19 @@ def ExportAskpass()
   askpass_exported = true
 enddef
 
+# A loopback TCP port is open to every local user, so a child must present a
+# secret only the environment of this instance carries. Vim reads no random
+# bytes but from a file, which Windows lacks. There each srand() draws a fresh
+# 32-bit seed from ProcessPrng(), the CSPRNG of the OS, since Vim 9.1.0518;
+# its help still names time(NULL), which is used only before Windows 10.
+def Token(): string
+  try
+    return join(mapnew(blob2list(readblob('/dev/urandom', 0, 16)), (_, v) => printf('%02x', v)), '')
+  catch
+    return sha256(string(mapnew(range(8), (_, _) => srand())))
+  endtry
+enddef
+
 # shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
 def ShellQuote(s: string): string
   return "'" .. substitute(s, "'", "'\\\\''", 'g') .. "'"
@@ -92,10 +108,10 @@ def OnAccept(ch: channel, _: string)
   # An accepted channel does not inherit "mode" from ch_listen(), and the
   # "json" mode would take the child's requests for responses to our own
   # requests. Read raw lines and decode them here instead.
-  ch_setoptions(ch, {mode: 'nl', callback: OnMessage})
+  ch_setoptions(ch, {mode: 'nl', callback: function(OnMessage, [{authorized: false}])})
 enddef
 
-def OnMessage(ch: channel, raw: string)
+def OnMessage(state: dict<bool>, ch: channel, raw: string)
   var message: any
   try
     message = json_decode(raw)
@@ -106,6 +122,16 @@ def OnMessage(ch: channel, raw: string)
     return
   endif
   const [id, expr] = message
+  # Anything but the right token first is not from a child of this instance,
+  # and it gets no reply that could tell it what is wrong.
+  if !state.authorized
+    if get(expr, 0, '') !=# 'auth' || type(get(expr, 1, v:null)) != v:t_string
+        || sha256(expr[1]) !=# sha256(token)
+      ch_close(ch)
+      return
+    endif
+    state.authorized = true
+  endif
   def Reply(err: string, ...result: list<any>)
     if ch_status(ch) ==# 'open'
       ch_sendraw(ch, json_encode([id, extend({error: err}, empty(result) ? {} : {result: result[0]})]) .. "\n")
@@ -147,7 +173,7 @@ def Dispatch(expr: list<any>, Reply: func(string, ...list<any>), Connected: func
     else
       PromptInTurn(() => inputsecret(prompt), Reply, Connected)
     endif
-  elseif method ==# 'ping'
+  elseif method ==# 'auth'
     Reply('')
   elseif method ==# 'error'
     echohl ErrorMsg

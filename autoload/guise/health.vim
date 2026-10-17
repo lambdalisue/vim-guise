@@ -20,7 +20,7 @@ function! guise#health#check() abort
           \ 'guise does not start in a headless instance'))
     return sections
   endif
-  call add(results, s:result('ok', printf('The server listens on %s', $GUISE_ADDRESS)))
+  call add(results, s:result('ok', printf('The server listens on %s', s:without_token($GUISE_ADDRESS))))
 
   if has('win32')
     call add(results, s:result('info', 'The shell is not checked on Windows'))
@@ -38,7 +38,7 @@ function! guise#health#check() abort
 
   if env.GUISE_ADDRESS !=# $GUISE_ADDRESS
     call add(results, s:result('error',
-          \ printf('$GUISE_ADDRESS in the shell is "%s", so programs there cannot reach this instance', env.GUISE_ADDRESS),
+          \ printf('$GUISE_ADDRESS in the shell is "%s", so programs there cannot reach this instance', s:without_token(env.GUISE_ADDRESS)),
           \ 'Do not overwrite or unset $GUISE_ADDRESS in the startup files of the shell'))
   else
     call add(results, s:result('ok', '$GUISE_ADDRESS reaches the shell'))
@@ -79,6 +79,12 @@ endfunction
 
 function! s:result(level, msg, ...) abort
   return {'level': a:level, 'msg': a:msg, 'advice': a:0 ? a:1 : ''}
+endfunction
+
+" A report gets pasted into issues, and the token lets anyone who reads it
+" act as a child of this instance.
+function! s:without_token(address) abort
+  return substitute(a:address, '#\x\+$', '', '')
 endfunction
 
 " Return the variables an interactive shell ends up with. printenv keeps the
