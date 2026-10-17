@@ -84,7 +84,7 @@ function! s:probe(cmd, setup, expr) abort
         \ 'call writefile([' .. a:expr .. '], ' .. string(out) .. ')',
         \ 'qall!',
         \], scriptfile)
-  let job = s:spawn([], 'GUISE_ADDRESS= EDITOR=original VISUAL=original ' .. a:cmd .. ' -S ' .. shellescape(scriptfile))
+  let job = s:spawn([], 'GUISE_ADDRESS= EDITOR=original VISUAL=original SSH_ASKPASS=original SUDO_ASKPASS=original SSH_ASKPASS_REQUIRE= ' .. a:cmd .. ' -S ' .. shellescape(scriptfile))
   call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'probed instance does not exit')
   return filereadable(out) ? readfile(out)[0] : '<no output>'
 endfunction
@@ -102,12 +102,13 @@ function! s:test_headless_nvim_does_not_start_server() abort
 endfunction
 
 " Start a separate parent of the same kind as this instance, after running
-" {setup} in it, and return [job, $GUISE_ADDRESS, $EDITOR] of it.
-function! s:start_parent(setup) abort
+" {setup} in it, and return [job, $GUISE_ADDRESS, $EDITOR] of it. Lines of
+" [presetup] run before guise is loaded.
+function! s:start_parent(setup, ...) abort
   let info = s:tmpdir .. '/parent.info'
   call delete(info)
   let scriptfile = s:tmpdir .. '/parent.vim'
-  call writefile([
+  call writefile((a:0 ? a:1 : []) + [
         \ 'let g:guise#enable_headless = 1',
         \ 'set runtimepath^=' .. fnameescape(s:root),
         \ 'runtime plugin/guise.vim',
@@ -236,6 +237,263 @@ function! s:test_open_without_arguments_opens_scratch_buffer() abort
   execute 'bwipeout!' bufnr
   call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'editor does not exit')
   call assert_equal(0, job.exitval)
+endfunction
+
+function! s:test_askpass_is_exported() abort
+  call assert_match('^/', $SSH_ASKPASS)
+  call assert_true(executable($SSH_ASKPASS), '$SSH_ASKPASS is not executable')
+  call assert_equal($SSH_ASKPASS, $SUDO_ASKPASS)
+endfunction
+
+" A job has no terminal for ssh to read a passphrase from, and ssh uses
+" $SSH_ASKPASS without $DISPLAY only when $SSH_ASKPASS_REQUIRE is "force".
+function! s:test_askpass_is_forced_for_ssh() abort
+  call assert_equal('force', $SSH_ASKPASS_REQUIRE)
+endfunction
+
+function! s:test_ssh_askpass_require_of_user_is_kept() abort
+  let setup = ['let g:guise#enable_headless = 1']
+  call assert_equal('never', s:probe('SSH_ASKPASS_REQUIRE=never vim -Nu NONE -i NONE -n -es', setup, '$SSH_ASKPASS_REQUIRE'))
+  call assert_equal('never', s:probe('SSH_ASKPASS_REQUIRE=never nvim --headless --clean -n', setup, '$SSH_ASKPASS_REQUIRE'))
+endfunction
+
+function! s:test_disable_askpass_accepts_boolean() abort
+  let setup = ['let g:guise#enable_headless = 1', 'let g:guise#disable_askpass = v:true']
+  for cmd in ['vim -Nu NONE -i NONE -n -es', 'nvim --headless --clean -n']
+    call assert_equal('original', s:probe(cmd, setup, '$SSH_ASKPASS'))
+    call assert_equal('original', s:probe(cmd, setup, '$SUDO_ASKPASS'))
+    call assert_equal('', s:probe(cmd, setup, '$SSH_ASKPASS_REQUIRE'))
+  endfor
+endfunction
+
+" Run {askpass} with {prompt} as a program would, and return [job, file that
+" receives its stdout].
+function! s:spawn_askpass(askpass, prompt, ...) abort
+  let out = tempname()
+  let env = a:0 ? a:1 : ''
+  let job = s:spawn([], join([env, a:askpass, shellescape(a:prompt), '>', shellescape(out), '</dev/null']))
+  return [job, out]
+endfunction
+
+" Start a separate parent that s:type() can answer the prompts of, after
+" running [setup] in it, and return it. A prompt sets typeahead aside, so the
+" keys must arrive once it is open: Vim in silent Ex mode reads them from
+" stdin after it marks the prompt open, and a timer of Neovim feeds them while
+" a prompt is open.
+function! s:start_prompting_parent(...) abort
+  let keysfile = tempname()
+  let markfile = tempname()
+  let setup = a:0 ? a:1 : []
+  if has('nvim')
+    call add(setup, printf(
+          \ 'call timer_start(50, { -> mode() ==# "c" && filereadable(%s) ? feedkeys(readfile(%s, "b")[0], "t") + delete(%s) : 0 }, {"repeat": -1})',
+          \ string(keysfile), string(keysfile), string(keysfile)))
+  else
+    call add(setup, printf('autocmd CmdlineEnter * call writefile([], %s)', string(markfile)))
+  endif
+  let [job, address, _] = s:start_parent(setup)
+  return {
+        \ 'job': job,
+        \ 'keysfile': keysfile,
+        \ 'markfile': markfile,
+        \ 'env': 'GUISE_ADDRESS=' .. shellescape(address),
+        \}
+endfunction
+
+" Type {keys}, which end with "\r" for Vim, into the next prompt of {parent}.
+function! s:type(parent, keys) abort
+  if has('nvim')
+    call writefile([a:keys], a:parent.keysfile .. '.tmp', 'b')
+    call rename(a:parent.keysfile .. '.tmp', a:parent.keysfile)
+    return
+  endif
+  if !s:wait(5000, { -> filereadable(a:parent.markfile) })
+    return
+  endif
+  call delete(a:parent.markfile)
+  call ch_sendraw(job_getchannel(a:parent.job.id), substitute(a:keys, "\r$", "\n", ''))
+endfunction
+
+function! s:test_askpass_prints_answer_typed_in_parent() abort
+  let parent = s:start_prompting_parent()
+  try
+    let [job, out] = s:spawn_askpass(shellescape($SSH_ASKPASS), 'Passphrase:', parent.env)
+    call s:type(parent, "s3cr'et\r")
+    call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+    call assert_equal(0, job.exitval)
+    call assert_equal(["s3cr'et"], readfile(out))
+  finally
+    call s:kill(parent.job)
+  endtry
+endfunction
+
+" Keys typed for editing before a prompt opens are not the answer to it.
+function! s:test_askpass_keeps_typeahead_of_parent() abort
+  let parent = s:start_prompting_parent(['call feedkeys("ordinary\r", "t")'])
+  try
+    let [job, out] = s:spawn_askpass(shellescape($SSH_ASKPASS), 'Passphrase:', parent.env)
+    call s:type(parent, "secret\r")
+    call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+    call assert_equal(0, job.exitval)
+    call assert_equal(['secret'], readfile(out))
+  finally
+    call s:kill(parent.job)
+  endtry
+endfunction
+
+function! s:test_askpass_from_the_other_editor() abort
+  let other = has('nvim')
+        \ ? 'vim -Nu NONE -i NONE -n -es -S'
+        \ : 'nvim --headless --clean -n -S'
+  if !executable(split(other)[0])
+    throw 'Skipped: ' .. split(other)[0] .. ' is not executable'
+  endif
+  let parent = s:start_prompting_parent()
+  try
+    let [job, out] = s:spawn_askpass(join([other, shellescape(s:root .. '/script/askpass.vim'), '--']), 'Passphrase:', parent.env)
+    call s:type(parent, "secret\r")
+    call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+    call assert_equal(0, job.exitval)
+    call assert_equal(['secret'], readfile(out))
+  finally
+    call s:kill(parent.job)
+  endtry
+endfunction
+
+" ssh-agent takes an empty answer to a confirmation as approval, so leaving
+" the prompt without typing "yes" must refuse it.
+function! s:test_askpass_confirmation_needs_yes() abort
+  let cases = [
+        \ ["yes\r", 0, ['yes']],
+        \ ["no\r", 1, []],
+        \ ["\r", 1, []],
+        \]
+  " Vim in silent Ex mode reads a prompt from stdin, where <Esc> is a
+  " character.
+  if has('nvim')
+    call add(cases, ["\<Esc>", 1, []])
+  endif
+  let parent = s:start_prompting_parent()
+  try
+    for [keys, exitval, output] in cases
+      let [job, out] = s:spawn_askpass(shellescape($SSH_ASKPASS), 'Allow use of key?', parent.env .. ' SSH_ASKPASS_PROMPT=confirm')
+      call s:type(parent, keys)
+      call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit for ' .. string(keys))
+      call assert_equal(exitval, job.exitval, string(keys))
+      call assert_equal(output, readfile(out), string(keys))
+    endfor
+  finally
+    call s:kill(parent.job)
+  endtry
+endfunction
+
+" A prompt opened while another one waits for keys would take over the rest of
+" them. The prompt blocks this instance, so timers drive the test.
+function! s:test_askpass_prompts_one_at_a_time() abort
+  " Timers do not run while input() waits in the silent Ex mode of Vim.
+  if !has('nvim')
+    return
+  endif
+  let jobs = {}
+  call timer_start(0, { -> extend(jobs, {'first': s:spawn_askpass(shellescape($SSH_ASKPASS), 'First:')}) })
+  call timer_start(500, { -> extend(jobs, {'second': s:spawn_askpass(shellescape($SSH_ASKPASS), 'Second:')}) })
+  call timer_start(1000, { -> feedkeys("one\<CR>", 't') })
+  call timer_start(1500, { -> feedkeys("two\<CR>", 't') })
+  let Done = { name -> has_key(jobs, name) && jobs[name][0].exitval isnot# v:null }
+  call assert_true(s:wait(5000, { -> Done('first') && Done('second') }), 'askpass does not exit')
+  call assert_equal(['one'], readfile(jobs.first[1]))
+  call assert_equal(['two'], readfile(jobs.second[1]))
+endfunction
+
+" Nobody waits for the answer of a program that exited while its prompt was
+" queued, so the prompt must not open.
+function! s:test_askpass_skips_prompt_of_exited_program() abort
+  " Timers do not run while input() waits in the silent Ex mode of Vim.
+  if !has('nvim')
+    return
+  endif
+  let jobs = {}
+  let state = {}
+  call timer_start(0, { -> extend(jobs, {'first': s:spawn_askpass(shellescape($SSH_ASKPASS), 'First:')}) })
+  call timer_start(500, { -> extend(jobs, {'second': s:spawn_askpass(shellescape($SSH_ASKPASS), 'Second:')}) })
+  call timer_start(1000, { -> s:kill(jobs.second[0]) })
+  call timer_start(1500, { -> feedkeys("one\<CR>", 't') })
+  function! s:leave_prompt(state, ...) abort
+    let a:state.mode = mode()
+    if a:state.mode ==# 'c'
+      call feedkeys("\<Esc>", 't')
+    endif
+  endfunction
+  call timer_start(2500, function('s:leave_prompt', [state]))
+  call s:wait(3000, { -> has_key(state, 'mode') })
+  call assert_equal(['one'], readfile(jobs.first[1]))
+  call assert_notequal('c', get(state, 'mode', ''), 'a prompt is open for the exited program')
+endfunction
+
+" ssh shows a notification through askpass and kills it when it is done.
+function! s:test_askpass_notification_does_not_wait() abort
+  let [job, out] = s:spawn_askpass(shellescape($SSH_ASKPASS), 'Confirm user presence', 'SSH_ASKPASS_PROMPT=none')
+  call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+  call assert_equal(0, job.exitval)
+  call assert_equal([], readfile(out))
+endfunction
+
+" On Windows any local user can reach the TCP port of the server, so a parent
+" that does not export askpass must not prompt for a secret.
+function! s:test_ask_is_refused_when_askpass_is_disabled() abort
+  let [parent, address, editor] = s:start_parent([], ['let g:guise#disable_askpass = 1'])
+  try
+    let askpass = (has('nvim') ? 'nvim --headless --clean -n -S ' : 'vim -Nu NONE -i NONE -n -es -S ')
+          \ .. shellescape(s:root .. '/script/askpass.vim') .. ' --'
+    let [job, out] = s:spawn_askpass(askpass, 'Passphrase:', 'GUISE_ADDRESS=' .. shellescape(address))
+    call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+    call assert_notequal(0, job.exitval)
+    call assert_equal([], readfile(out))
+  finally
+    call s:kill(parent)
+  endtry
+endfunction
+
+" A parent waiting for a command it started synchronously (system(), :!)
+" cannot answer, but the command runs on the terminal of the parent. Vim
+" leaves the terminal raw for system() under ":silent".
+function! s:test_askpass_falls_back_to_terminal_while_parent_is_busy() abort
+  if !executable('python3')
+    return
+  endif
+  let [parent, address, _] = s:start_parent(['call timer_start(0, { -> system("sleep 30") })'])
+  try
+    for mode in ['cooked', 'raw']
+      for [keys, hint, exitval, output] in [
+            \ ["pa ss\r", '', 0, ['pa ss']],
+            \ ["yes\r", 'confirm', 0, ['yes']],
+            \ ["no\r", 'confirm', 1, []],
+            \]
+        let label = printf('%s %s', mode, string(keys))
+        let out = tempname()
+        let job = s:spawn([], join([
+              \ 'GUISE_ADDRESS=' .. shellescape(address),
+              \ 'SSH_ASKPASS_PROMPT=' .. hint,
+              \ 'python3 -I', shellescape(s:root .. '/test/pty_run.py'),
+              \ mode, 'Passphrase:', shellescape(keys), shellescape(out),
+              \ shellescape($SSH_ASKPASS), 'Passphrase:',
+              \]))
+        call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit for ' .. label)
+        call assert_equal(exitval, job.exitval, label)
+        call assert_equal(output, filereadable(out) ? readfile(out) : ['<no output>'], label)
+      endfor
+    endfor
+  finally
+    call s:kill(parent)
+  endtry
+endfunction
+
+" A program must not take a warning for the answer.
+function! s:test_askpass_fails_without_parent() abort
+  let [job, out] = s:spawn_askpass(shellescape($SSH_ASKPASS), 'Passphrase:', 'GUISE_ADDRESS=unix:' .. s:tmpdir .. '/nonexistent')
+  call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'askpass does not exit')
+  call assert_notequal(0, job.exitval)
+  call assert_equal([], readfile(out))
 endfunction
 
 " Run ":checkhealth guise" on Neovim or ":GuiseCheck" on Vim against an
