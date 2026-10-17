@@ -247,6 +247,9 @@ endfunction
 " Some programs split $EDITOR on whitespace and start it without a shell
 " (Claude Code), so a word that needs no quoting must not carry quotes.
 function! s:test_edit_works_without_shell() abort
+  if $EDITOR =~# '[''"]'
+    throw 'Skipped: a path in $EDITOR needs quotes, which only a shell removes'
+  endif
   let filename = s:tmpdir .. '/without-shell.txt'
   call writefile(['hello'], filename)
   let argv = split($EDITOR) + [filename]
@@ -291,6 +294,38 @@ function! s:test_edit_opens_each_file_in_order() abort
   endfor
   call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'editor does not exit')
   call assert_equal(0, job.exitval)
+endfunction
+
+" Programs that know Vim pass the line to show as +N before the file name
+" (Claude Code), which comes after the "--" that ends $EDITOR.
+function! s:test_edit_jumps_to_line_of_plus_argument() abort
+  let filename = s:tmpdir .. '/plus.txt'
+  call writefile(['a', 'b', 'c'], filename)
+  for [arg, lnum] in [['+2', 2], ['+', 3]]
+    let job = s:spawn([arg, filename])
+    let Found = { -> s:find_tab({ b -> s:same_file(bufname(b), filename) }) }
+    call assert_true(s:wait(5000, { -> Found() != 0 }), filename .. ' is not opened for ' .. arg)
+    call assert_equal(0, s:find_tab({ b -> fnamemodify(bufname(b), ':t') ==# arg }), arg .. ' is opened as a file')
+    call assert_equal(lnum, line('.'), 'cursor for ' .. arg)
+    execute 'bwipeout!' Found()
+    call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'editor does not exit for ' .. arg)
+    call assert_equal(0, job.exitval)
+  endfor
+endfunction
+
+" The line is put into a command, so anything but a line must not reach it.
+function! s:test_server_refuses_line_that_is_not_a_number() abort
+  if !executable('python3')
+    return
+  endif
+  let filename = s:tmpdir .. '/line.txt'
+  let token = matchstr($GUISE_ADDRESS, '#\zs\x\+$')
+  let replies = s:raw_request([
+        \ json_encode([1, ['auth', token]]),
+        \ json_encode([2, ['edit', filename, 'let g:guise_test_injected = 1']]),
+        \])
+  call assert_match('^\[2,.*"error":\s*"[^"]', get(replies, -1, ''))
+  call assert_equal(0, s:find_tab({ b -> s:same_file(bufname(b), filename) }))
 endfunction
 
 function! s:test_edit_from_the_other_editor() abort

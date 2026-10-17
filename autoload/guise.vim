@@ -15,12 +15,20 @@ function! guise#askpass(address, prompt, hint) abort
   execute 'cquit!' s:UNREACHABLE
 endfunction
 
+" Only +N and + are taken from the +{command} arguments of Vim, so that a
+" child cannot run an arbitrary command in the parent. Vim applies them to the
+" first file, and so does this.
 function! s:edit(argv, chan) abort
-  if empty(a:argv)
+  let pattern = '^+\d*$'
+  let jumps = filter(copy(a:argv), { _, v -> v =~# pattern })
+  let files = filter(copy(a:argv), { _, v -> v !~# pattern })
+  if empty(files)
     call s:request(a:chan, 'open', [])
   else
-    for filename in a:argv
-      call s:request(a:chan, 'edit', [fnamemodify(filename, ':p')])
+    let line = empty(jumps) ? [] : [jumps[-1] ==# '+' ? '$' : str2nr(jumps[-1][1 :])]
+    for filename in files
+      call s:request(a:chan, 'edit', [fnamemodify(filename, ':p')] + line)
+      let line = []
     endfor
   endif
 endfunction

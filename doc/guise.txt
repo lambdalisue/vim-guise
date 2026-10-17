@@ -22,6 +22,11 @@ new nested instance when a user tried to open a new Vim/Neovim through a job
 or terminal on the instance. It also lets such a program ask for a passphrase
 or a password with a prompt of the instance. See |guise-askpass|.
 
+"$EDITOR" opens each file it is given in the instance. Like Vim, it puts the
+cursor on line N of the first file for "+N", and on the last line for "+".
+Any other argument that starts with "+" is taken as a file name, so that a
+program cannot run a command in the instance.
+
 guise requires Vim 9.2.0153 or above (for |ch_listen()|) or Neovim 0.10.0 or
 above. On older Vim it shows a warning and does nothing.
 

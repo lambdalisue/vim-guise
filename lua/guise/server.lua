@@ -70,15 +70,24 @@ local handlers = {
     vim.cmd("tabnew")
     wait_wipe(reply)
   end,
-  edit = function(reply, _, filename)
+  edit = function(reply, _, filename, line)
     -- fnameescape() leaves a newline as it is, and vim.cmd() runs each line as
     -- a command of its own.
     if filename:find("\n", 1, true) then
       reply("[guise] a file name that contains a newline cannot be opened")
       return
     end
+    if line ~= nil and line ~= "$" and (type(line) ~= "number" or line % 1 ~= 0) then
+      reply('[guise] a line must be a number or "$"')
+      return
+    end
     local opener = vim.g.guise_edit_opener or "tab drop"
     vim.cmd(("silent noswapfile %s %s"):format(opener, vim.fn.fnameescape(filename)))
+    if line ~= nil then
+      local last = vim.api.nvim_buf_line_count(0)
+      local lnum = line == "$" and last or math.min(math.max(line, 1), last)
+      vim.api.nvim_win_set_cursor(0, { lnum, 0 })
+    end
     wait_wipe(reply)
   end,
   ask = function(reply, connected, prompt, hint)

@@ -162,8 +162,18 @@ def Dispatch(expr: list<any>, Reply: func(string, ...list<any>), Connected: func
       Reply('[guise] a file name that contains a newline cannot be opened')
       return
     endif
+    const lnum = get(expr, 2, '')
+    const last = type(lnum) == v:t_string && lnum ==# '$'
+    const jump = last || type(lnum) == v:t_number
+    if len(expr) > 2 && !jump
+      Reply('[guise] a line must be a number or "$"')
+      return
+    endif
     const opener = get(g:, 'guise_edit_opener', 'tab drop')
     execute $'silent noswapfile {opener} {fnameescape(expr[1])}'
+    if jump
+      cursor(last ? line('$') : max([lnum, 1]), 1)
+    endif
     WaitWipe(Reply)
   elseif method ==# 'ask'
     if !askpass_exported
