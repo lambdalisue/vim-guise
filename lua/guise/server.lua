@@ -3,18 +3,50 @@
 -- Speaks the same newline-delimited JSON protocol as the Vim server
 -- (autoload/guise/server.vim) so that Vim and Neovim children can talk to
 -- either parent: a request is `[id, [method, ...args]]` and the reply is
--- `[id, { error = message }]`, where the empty message means success.
+-- `[id, { error = message, result = value }]`, where the empty message means
+-- success and `result` is present only for a request that returns a value.
 
 local M = {}
 
-local editor_script = vim.fs.joinpath(
-  vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p")))),
-  "script",
-  "editor.vim"
-)
+local root =
+  vim.fs.dirname(vim.fs.dirname(vim.fs.dirname(vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p"))))
+local editor_script = vim.fs.joinpath(root, "script", "editor.vim")
+local askpass_script = vim.fs.joinpath(root, "script", "askpass.vim")
+local askpass_shell_script = vim.fs.joinpath(root, "script", "askpass.sh")
 
 -- Replies waiting for a buffer to be wiped, keyed by the buffer number.
 local pending = {}
+-- Any local user can reach the TCP port used on Windows, so the server prompts
+-- for a secret only when it has exported askpass, which it never does there.
+local askpass_exported = false
+-- Prompts waiting for the one that is reading keys, which a prompt opened in
+-- the meantime would take over.
+local prompts = {}
+local prompting = false
+
+local function prompt_in_turn(read, reply, connected)
+  table.insert(prompts, { read = read, reply = reply, connected = connected })
+  if prompting then
+    return
+  end
+  prompting = true
+  while #prompts > 0 do
+    local next_prompt = table.remove(prompts, 1)
+    -- The program exited while its prompt was queued.
+    if next_prompt.connected() then
+      -- Keys typed for editing before the prompt opened are not the answer.
+      vim.fn.inputsave()
+      local ok, result = pcall(next_prompt.read)
+      vim.fn.inputrestore()
+      if ok then
+        next_prompt.reply("", result)
+      else
+        next_prompt.reply(tostring(result))
+      end
+    end
+  end
+  prompting = false
+end
 
 local function resolve(bufnr, err)
   local replies = pending[bufnr]
@@ -32,19 +64,35 @@ local function wait_wipe(reply)
 end
 
 local handlers = {
-  open = function(reply)
+  open = function(reply, _)
     vim.cmd("tabnew")
     wait_wipe(reply)
   end,
-  edit = function(reply, filename)
+  edit = function(reply, _, filename)
     local opener = vim.g.guise_edit_opener or "tab drop"
     vim.cmd(("silent noswapfile %s %s"):format(opener, vim.fn.fnameescape(filename)))
     wait_wipe(reply)
   end,
-  ping = function(reply)
+  ask = function(reply, connected, prompt, hint)
+    if not askpass_exported then
+      reply("[guise] askpass is disabled")
+    elseif hint == "none" then
+      vim.notify(prompt)
+      reply("", "")
+    elseif hint == "confirm" then
+      prompt_in_turn(function()
+        return vim.fn.input(("%s (yes/no) "):format(prompt))
+      end, reply, connected)
+    else
+      prompt_in_turn(function()
+        return vim.fn.inputsecret(prompt)
+      end, reply, connected)
+    end
+  end,
+  ping = function(reply, _)
     reply("")
   end,
-  error = function(reply, exception, throwpoint)
+  error = function(reply, _, exception, throwpoint)
     vim.notify(table.concat({ exception, throwpoint }, "\n"), vim.log.levels.ERROR)
     reply("")
   end,
@@ -56,9 +104,9 @@ local function dispatch(client, line)
     return
   end
   local id, expr = message[1], message[2]
-  local function reply(err)
+  local function reply(err, result)
     if not client:is_closing() then
-      client:write(vim.json.encode({ id, { error = err } }) .. "\n")
+      client:write(vim.json.encode({ id, { error = err, result = result } }) .. "\n")
     end
   end
   local handler = handlers[expr[1]]
@@ -66,7 +114,10 @@ local function dispatch(client, line)
     reply(("Unknown method: %s"):format(tostring(expr[1])))
     return
   end
-  local succeeded, err = pcall(handler, reply, unpack(expr, 2))
+  local function connected()
+    return not client:is_closing()
+  end
+  local succeeded, err = pcall(handler, reply, connected, unpack(expr, 2))
   if not succeeded then
     reply(tostring(err))
   end
@@ -92,6 +143,37 @@ local function accept(server, new_handle)
 end
 
 local is_windows = vim.fn.has("win32") == 1
+
+-- shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
+local function shell_quote(s)
+  return "'" .. s:gsub("'", [['\'']]) .. "'"
+end
+
+-- $SSH_ASKPASS and $SUDO_ASKPASS name a program that is run without arguments
+-- of our own, so a wrapper script carries the command line.
+local function export_askpass()
+  local askpass = vim.fn.tempname()
+  vim.fn.writefile({
+    "#!/bin/sh",
+    table.concat({
+      "exec /bin/sh",
+      shell_quote(askpass_shell_script),
+      shell_quote(vim.v.progpath),
+      "--headless --clean -n -S",
+      shell_quote(askpass_script),
+      '-- "$@"',
+    }, " "),
+  }, askpass)
+  vim.fn.setfperm(askpass, "rwx------")
+  vim.env.SSH_ASKPASS = askpass
+  vim.env.SUDO_ASKPASS = askpass
+  -- A job has no terminal for ssh to read a passphrase from, and ssh uses
+  -- $SSH_ASKPASS without $DISPLAY only when $SSH_ASKPASS_REQUIRE is "force".
+  if (vim.env.SSH_ASKPASS_REQUIRE or "") == "" then
+    vim.env.SSH_ASKPASS_REQUIRE = "force"
+  end
+  askpass_exported = true
+end
 
 function M.start()
   -- A socket in Neovim's private temporary directory keeps other local users
@@ -135,6 +217,10 @@ function M.start()
       "--",
     }, " ")
     vim.env.VISUAL = vim.env.EDITOR
+  end
+  local disable_askpass = vim.g["guise#disable_askpass"]
+  if not is_windows and (not disable_askpass or disable_askpass == 0) then
+    export_askpass()
   end
 
   local group = vim.api.nvim_create_augroup("guise_server_internal", {})

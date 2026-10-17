@@ -9,7 +9,9 @@
 
 Guise is a Vim/Neovim plugin that opens a new tab page rather than
 invokes a new nested instance when a user tried to open a new Vim/Neovim through
-a job or terminal on the instance.
+a job or terminal on the instance. It also lets such a program ask for a
+passphrase or a password (e.g. `git push` over SSH, `sudo -A`) with a prompt of
+the instance.
 
 ![Vim](https://user-images.githubusercontent.com/546312/130876263-5a5a8e29-1204-455a-84af-0070c8776b6f.gif)
 
@@ -48,9 +50,18 @@ end
 `:checkhealth guise` on Neovim and `:GuiseCheck` on Vim report whether your
 shell keeps these variables. See `:help guise-shell` for details.
 
+## Askpass
+
+guise exports `$SSH_ASKPASS` and `$SUDO_ASKPASS` too, and sets
+`$SSH_ASKPASS_REQUIRE` to `force` unless it is already set, because ssh does not
+use `$SSH_ASKPASS` without `$DISPLAY` otherwise. ssh in a terminal then asks in
+the instance as well, while a program started by `system()` or `:!`, which the
+instance cannot answer during, asks on the terminal. This replaces
+[lambdalisue/askpass.vim](https://github.com/lambdalisue/askpass.vim). See
+`:help guise-askpass` for details.
+
 ## Similar projects
 
-- [lambdalisue/askpass.vim](https://github.com/lambdalisue/askpass.vim)
 - [thinca/vim-singleton](https://github.com/thinca/vim-singleton)
 - [lambdalisue/edita.vim](https://github.com/lambdalisue/edita.vim)
 - [mhinz/neovim-remote](https://github.com/mhinz/neovim-remote)

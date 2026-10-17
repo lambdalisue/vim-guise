@@ -9,12 +9,16 @@ on:
     paths:
       - "**/*.vim"
       - "**/*.lua"
+      - "**/*.sh"
+      - "**/*.py"
       - ".github/workflows/test.yml"
       - "Makefile"
   pull_request:
     paths:
       - "**/*.vim"
       - "**/*.lua"
+      - "**/*.sh"
+      - "**/*.py"
       - ".github/workflows/test.yml"
       - "Makefile"
 

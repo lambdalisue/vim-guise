@@ -1,4 +1,46 @@
 function! guise#open(address, argv) abort
+  call s:run(a:address, function('s:edit', [a:argv]), s:PING_TIMEOUT)
+endfunction
+
+" Print the answer the parent prompts for {prompt} to stdout, as an askpass
+" program does. {hint} is the value of $SSH_ASKPASS_PROMPT: "confirm" asks
+" for approval, which only "yes" gives, and "none" only shows {prompt}.
+"
+" It quits with s:UNREACHABLE when the parent does not answer, which a parent
+" waiting for a command it started synchronously (system(), :!) cannot, so
+" that script/askpass.sh asks on the terminal of the parent instead. A short
+" wait keeps that from stalling the command.
+function! guise#askpass(address, prompt, hint) abort
+  call s:run(a:address, function('s:ask', [a:prompt, a:hint]), s:ASKPASS_PING_TIMEOUT)
+  execute 'cquit!' s:UNREACHABLE
+endfunction
+
+function! s:edit(argv, chan) abort
+  if empty(a:argv)
+    call s:request(a:chan, 'open', [])
+  else
+    for filename in a:argv
+      call s:request(a:chan, 'edit', [fnamemodify(filename, ':p')])
+    endfor
+  endif
+endfunction
+
+function! s:ask(prompt, hint, chan) abort
+  let answer = s:request(a:chan, 'ask', [a:prompt, a:hint])
+  if a:hint ==# 'none'
+    return
+  elseif a:hint ==# 'confirm' && answer !~? '^\s*yes\s*$'
+    " ssh-agent takes an empty answer as approval, so refuse by the exit
+    " status instead.
+    return v:false
+  endif
+  call writefile([answer], '/dev/stdout')
+endfunction
+
+" Call {Do} with a channel to the parent at {address} and quit, or return when
+" the parent cannot be reached. {Do} returns v:false to quit with failure
+" without reporting an error to the parent.
+function! s:run(address, Do, ping_timeout) abort
   let chan = s:connect(a:address)
   if chan is# v:null
     return
@@ -8,23 +50,17 @@ function! guise#open(address, argv) abort
   " connection then succeeds with nobody behind it, and only a reply proves the
   " parent is alive. Waiting for an edit has no time limit, so check it first.
   try
-    call s:request(chan, 'ping', [], s:PING_TIMEOUT)
+    call s:request(chan, 'ping', [], a:ping_timeout)
   catch
     echohl ErrorMsg
     echomsg printf('[guise] the parent at "%s" does not respond', a:address)
     echohl None
-    cquit!
+    execute 'cquit!' s:UNREACHABLE
   endtry
   try
-    if empty(a:argv)
-      call s:request(chan, 'open', [])
-    else
-      for filename in a:argv
-        call s:request(chan, 'edit', [fnamemodify(filename, ':p')])
-      endfor
-    endif
+    let succeeded = a:Do(chan) isnot# v:false
     call s:close(chan)
-    qall!
+    execute succeeded ? 'qall!' : 'cquit!'
   catch
     let [exception, throwpoint] = [v:exception, v:throwpoint]
     try
@@ -38,10 +74,14 @@ function! guise#open(address, argv) abort
 endfunction
 
 let s:PING_TIMEOUT = 5000
+let s:ASKPASS_PING_TIMEOUT = 1000
+let s:UNREACHABLE = 2
 
-" A reply is {'error': message}, where the empty message means success. Any
-" other value means the connection was lost before the request was done; Vim's
-" ch_evalexpr() returns an empty string then, which must not read as success.
+" A reply is {'error': message, 'result': value}, where the empty message
+" means success and "result" is present only for a request that returns a
+" value. Any other reply means the connection was lost before the request was
+" done; Vim's ch_evalexpr() returns an empty string then, which must not read
+" as success.
 function! s:check(reply) abort
   if type(a:reply) != v:t_dict
     throw '[guise] connection is closed before the request is done'
@@ -49,6 +89,7 @@ function! s:check(reply) abort
   if !empty(a:reply.error)
     throw a:reply.error
   endif
+  return get(a:reply, 'result', v:null)
 endfunction
 
 if has('nvim')
@@ -99,7 +140,7 @@ if has('nvim')
     let id = a:chan.next
     call chansend(a:chan.id, json_encode([id, [a:fn] + a:args]) .. "\n")
     call wait(a:0 ? a:1 : -1, { -> has_key(a:chan.replies, id) || a:chan.closed })
-    call s:check(get(a:chan.replies, id, v:null))
+    return s:check(get(a:chan.replies, id, v:null))
   endfunction
 else
   function! s:connect(address) abort
@@ -127,7 +168,7 @@ else
 
   function! s:request(chan, fn, args, ...) abort
     let options = a:0 ? {'timeout': a:1} : {}
-    call s:check(ch_evalexpr(a:chan, [a:fn] + a:args, options))
+    return s:check(ch_evalexpr(a:chan, [a:fn] + a:args, options))
   endfunction
 endif
 

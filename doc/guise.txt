@@ -8,6 +8,7 @@ CONTENTS						*guise-contents*
 
 INTRODUCTION				|guise-introduction|
 SHELL					|guise-shell|
+ASKPASS					|guise-askpass|
 INTERFACE				|guise-interface|
   COMMAND				|guise-command|
   VARIABLE				|guise-variable|
@@ -18,7 +19,8 @@ INTRODUCTION						*guise-introduction*
 
 *guise* is a plugin that open a new tab page rather than invokes a
 new nested instance when a user tried to open a new Vim/Neovim through a job
-or terminal on the instance.
+or terminal on the instance. It also lets such a program ask for a passphrase
+or a password with a prompt of the instance. See |guise-askpass|.
 
 guise requires Vim 9.2.0153 or above (for |ch_listen()|) or Neovim 0.10.0 or
 above. On older Vim it shows a warning and does nothing.
@@ -70,6 +72,37 @@ untouched by guise.
 
 
 =============================================================================
+ASKPASS							*guise-askpass*
+
+guise exports "$SSH_ASKPASS" and "$SUDO_ASKPASS" as well, so that a program
+started from a job or |terminal| asks for a passphrase or a password with
+|inputsecret()| of the running Vim/Neovim instead of a terminal, which a job
+does not have. Git also asks for credentials through "$SSH_ASKPASS" unless
+"$GIT_ASKPASS" or "core.askPass" names another program. sudo uses
+"$SUDO_ASKPASS" only with the "-A" option.
+
+ssh uses "$SSH_ASKPASS" without "$DISPLAY" only when "$SSH_ASKPASS_REQUIRE"
+is "force", so guise sets it to "force" unless it is already set. ssh in
+|terminal| then asks in the running instance too. Set "$SSH_ASKPASS_REQUIRE"
+before starting Vim/Neovim to keep another behavior.
+
+The answer is typed hidden, even for a question of ssh that is not a secret,
+such as whether to trust a host key. A confirmation, such as ssh-agent asks
+before using a key added with "ssh-add -c", is typed visibly and approves
+only when the answer is "yes". A notification of ssh, such as a request to
+touch a security key, is shown as a message without waiting for an answer.
+
+The running Vim/Neovim cannot answer while it waits for a command it started
+synchronously, such as |system()| or |:!|. A program run by such a command
+asks on the terminal instead, once the instance has not answered for a
+second.
+
+guise does not export them on Windows. Set |g:guise#disable_askpass| to keep
+"$SSH_ASKPASS", "$SUDO_ASKPASS", and "$SSH_ASKPASS_REQUIRE" untouched by
+guise.
+
+
+=============================================================================
 INTERFACE						*guise-interface*
 
 -----------------------------------------------------------------------------
@@ -105,6 +138,12 @@ VARIABLE						*guise-variable*
 
 *g:guise#disable_editor*
 	Do NOT overwrite "$EDITOR" and "$VISUAL" environment variables.
+
+	Default: 0
+
+*g:guise#disable_askpass*
+	Do NOT overwrite "$SSH_ASKPASS", "$SUDO_ASKPASS", and
+	"$SSH_ASKPASS_REQUIRE" environment variables. See |guise-askpass|.
 
 	Default: 0
 
