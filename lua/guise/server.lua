@@ -164,6 +164,12 @@ end
 
 local is_windows = vim.fn.has("win32") == 1
 
+-- Some programs split $EDITOR on whitespace and run it without a shell, where
+-- quotes would stay in the program name.
+local function shell_word(s)
+  return s:match("^[%w_@%%+=:,./-]+$") and s or vim.fn.shellescape(s)
+end
+
 -- shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
 local function shell_quote(s)
   return "'" .. s:gsub("'", [['\'']]) .. "'"
@@ -236,9 +242,9 @@ function M.start()
   local disable_editor = vim.g["guise#disable_editor"]
   if not disable_editor or disable_editor == 0 then
     vim.env.EDITOR = table.concat({
-      vim.fn.shellescape(vim.v.progpath),
+      shell_word(vim.v.progpath),
       "--headless --clean -n -S",
-      vim.fn.shellescape(editor_script),
+      shell_word(editor_script),
       "--",
     }, " ")
     vim.env.VISUAL = vim.env.EDITOR

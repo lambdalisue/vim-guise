@@ -240,8 +240,31 @@ endfunction
 " Programs in a terminal may run with another $PATH or working directory
 " (direnv, nix shell, cd), so $EDITOR must not depend on either.
 function! s:test_editor_uses_absolute_paths() abort
-  call assert_match('^''/[^'']\+'' ', $EDITOR)
-  call assert_match(' -S ''/[^'']\+/script/editor\.vim'' --$', $EDITOR)
+  call assert_match('^\%(''/[^'']\+''\|/\S\+\) ', $EDITOR)
+  call assert_match(' -S \%(''/[^'']\+/script/editor\.vim''\|/\S\+/script/editor\.vim\) --$', $EDITOR)
+endfunction
+
+" Some programs split $EDITOR on whitespace and start it without a shell
+" (Claude Code), so a word that needs no quoting must not carry quotes.
+function! s:test_edit_works_without_shell() abort
+  let filename = s:tmpdir .. '/without-shell.txt'
+  call writefile(['hello'], filename)
+  let argv = split($EDITOR) + [filename]
+  let job = {'exitval': v:null}
+  if has('nvim')
+    let job.id = jobstart(argv, {
+          \ 'on_exit': { _, code, ... -> extend(job, {'exitval': code}) },
+          \})
+  else
+    let job.id = job_start(argv, {
+          \ 'exit_cb': { _, code -> extend(job, {'exitval': code}) },
+          \})
+  endif
+  let Found = { -> s:find_tab({ b -> s:same_file(bufname(b), filename) }) }
+  call assert_true(s:wait(5000, { -> Found() != 0 }), 'buffer is not opened')
+  execute 'bwipeout!' Found()
+  call assert_true(s:wait(5000, { -> job.exitval isnot# v:null }), 'editor does not exit')
+  call assert_equal(0, job.exitval)
 endfunction
 
 function! s:test_edit_waits_until_buffer_is_wiped() abort

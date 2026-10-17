@@ -46,6 +46,11 @@ Some programs read a variable or a setting of their own first (e.g.
 "$GIT_EDITOR" of Git). Any of them that names another editor hides the value
 guise exported in the same way.
 
+Most programs run "$EDITOR" through a shell, but some split it on whitespace
+and start it without one. guise quotes a path in "$EDITOR" only when a shell
+needs the quotes, so such a program can start it as long as the paths of
+Vim/Neovim and of guise contain no space or other shell metacharacter.
+
 Assign the editor variables only when "$GUISE_ADDRESS" is empty, which means
 the shell is not running under guise.
 

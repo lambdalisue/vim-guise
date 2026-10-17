@@ -42,9 +42,9 @@ export def Start()
   $GUISE_ADDRESS = (has('win32') ? $'127.0.0.1:{ch_info(server).port}' : address) .. '#' .. token
   if !get(g:, 'guise#disable_editor', 0)
     $EDITOR = join([
-      shellescape(exepath(v:progpath)),
+      ShellWord(exepath(v:progpath)),
       '-Nu NONE -i NONE -n -es -S',
-      shellescape(EDITOR_SCRIPT),
+      ShellWord(EDITOR_SCRIPT),
       '--',
     ])
     $VISUAL = $EDITOR
@@ -97,6 +97,12 @@ def Token(): string
   catch
     return sha256(string(mapnew(range(8), (_, _) => srand())))
   endtry
+enddef
+
+# Some programs split $EDITOR on whitespace and run it without a shell, where
+# quotes would stay in the program name.
+def ShellWord(s: string): string
+  return s =~# '^[[:alnum:]_@%+=:,./-]\+$' ? s : shellescape(s)
 enddef
 
 # shellescape() follows 'shell', but the wrapper is always run by /bin/sh.
