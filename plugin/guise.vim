@@ -22,7 +22,22 @@ function! s:is_headless() abort
   return flags =~# '[eE]' && flags =~# 's'
 endfunction
 
+" The address of a parent that is gone is no parent: Neovim's :restart starts
+" the new server with the environment of the old one, whose server, socket and
+" askpass program went away with it (in its temporary directory). Act as a
+" parent then, which exports them anew.
+function! s:is_stale(address) abort
+  if get(v:, 'startreason', '') =~# '^restart'
+    return v:true
+  endif
+  let socket = matchstr(a:address, '^unix:\zs.\{-}\ze\%(#\x\+\)\=$')
+  return !empty(socket) && empty(getftype(socket))
+endfunction
+
 let s:address = $GUISE_ADDRESS
+if !empty(s:address) && s:is_stale(s:address)
+  let s:address = ''
+endif
 if empty(s:address)
   " Nobody can see a tab page opened in a headless instance, so a child
   " forwarded to it would wait forever.
