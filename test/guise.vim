@@ -198,6 +198,18 @@ function! s:test_edit_fails_when_parent_dies() abort
   call assert_notequal(0, child.exitval)
 endfunction
 
+function! s:test_parent_replaces_stale_address() abort
+  let stale = 'unix:' .. s:tmpdir .. '/gone/socket#' .. repeat('0', 32)
+  let [parent, address, _] = s:start_parent([],
+        \ ['let $GUISE_ADDRESS = ' .. string(stale)])
+  try
+    call assert_match('^unix:/', address)
+    call assert_notequal(stale, address)
+  finally
+    call s:kill(parent)
+  endtry
+endfunction
+
 " Vim does not set close-on-exec on a ch_listen() socket, so a process the
 " parent started keeps the socket listening after the parent dies. A child
 " then connects fine but nobody ever accepts the connection.
